@@ -469,7 +469,7 @@ export default function Home() {
           {snapshot.mode === "synthetic" && (
             <div className="replay-banner">
               <CircleAlert size={15} />
-              <span><b>Replay mode:</b> values are synthetic and clearly separated from live EPİAŞ data.</span>
+              <span><b>Replay mode:</b> fabricated next-day reference values demonstrate the workflow; they are neither EPİAŞ data nor future actuals.</span>
             </div>
           )}
 
