@@ -1,5 +1,7 @@
 # GridBrief TR
 
+[Live challenge demo](https://haakanergun.github.io/gridbrief-tr/) · [OpenAI WebMCP Challenge](https://webmcp.devpost.com/)
+
 **GridBrief TR** is an agent-native risk workspace for participants in Türkiye's electricity market. It turns a market operator's question—such as “I am short 50 MWh tomorrow from 17:00 to 22:00; what should I watch?”—into a human-reviewable, source- and freshness-aware shift brief.
 
 It is a decision-support prototype. It does not place orders, connect to a trading account, or recommend an execution. A human sets the exposure, changes assumptions, reviews the evidence, and explicitly approves a draft brief.
@@ -88,11 +90,11 @@ Deploy the app to a Node-compatible host using the repository's standard build c
 npm run build
 ```
 
-Add server-only EPİAŞ secrets only in the host’s encrypted environment configuration. The public challenge deployment is expected to run in synthetic mode with no EPİAŞ secret configured; it can do so safely. Before sharing a Node-compatible deployment, test the deployed URL, `GET /api/health`, the WebMCP tool registration, mode labels, and the no-secrets synthetic path.
+Add server-only EPİAŞ secrets only in the host’s encrypted environment configuration. The public challenge deployment runs in synthetic mode with no EPİAŞ secret configured. Before sharing a Node-compatible deployment, test the deployed URL, `GET /api/health`, the WebMCP tool registration, mode labels, and the no-secrets synthetic path.
 
 ### GitHub Pages fallback
 
-The repository includes a GitHub Actions workflow that publishes a static, synthetic-only demo at `/gridbrief-tr`. The workflow removes server-only API routes in its disposable checkout, builds with `GITHUB_PAGES=true` and `NEXT_PUBLIC_STATIC_DEMO=true`, and deploys the generated `out` directory. In this build only, form and WebMCP refreshes generate the same deterministic, clearly labelled synthetic snapshot directly in the browser; standard local and Node-compatible deployments continue to use `POST /api/market` unchanged. The Pages fallback intentionally has no `/api/*` endpoints.
+The repository includes a GitHub Actions workflow that publishes the [public challenge demo](https://haakanergun.github.io/gridbrief-tr/) as a static, synthetic-only build. The workflow removes server-only API routes in its disposable checkout, builds with `GITHUB_PAGES=true` and `NEXT_PUBLIC_STATIC_DEMO=true`, and deploys the generated `out` directory. In this build only, form and WebMCP refreshes generate the same deterministic, clearly labelled synthetic snapshot directly in the browser; standard local and Node-compatible deployments continue to use `POST /api/market` unchanged. The Pages fallback intentionally has no `/api/*` endpoints.
 
 ## Project notes
 
