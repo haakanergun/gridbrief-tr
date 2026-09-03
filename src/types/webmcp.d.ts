@@ -28,7 +28,7 @@ interface WebMcpToolDefinition {
   annotations?: WebMcpToolAnnotations;
   execute: (
     input: Record<string, unknown>,
-    options: WebMcpToolExecuteOptions,
+    options?: WebMcpToolExecuteOptions | AbortSignal,
   ) => Promise<WebMcpJsonValue>;
 }
 

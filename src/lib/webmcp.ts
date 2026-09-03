@@ -374,11 +374,17 @@ function createExecuteCallback(
   onActivity?: WebMcpActivityListener,
 ): WebMcpToolDefinition["execute"] {
   return async (rawInput, options) => {
+    // Chrome 152's testing implementation can omit the callback options when
+    // executeTool() is called without a cancellation signal. The current spec
+    // supplies {signal}; accept both shapes so the tool remains progressive.
+    const signal = options instanceof AbortSignal
+      ? options
+      : options?.signal ?? new AbortController().signal;
     const id = makeExecutionId(blueprint.name);
     const occurredAt = new Date().toISOString();
     const input = toJsonValue(rawInput);
     const context: WebMcpExecutionContext = {
-      signal: options.signal,
+      signal,
       toolName: blueprint.name,
     };
 
@@ -391,9 +397,9 @@ function createExecuteCallback(
     });
 
     try {
-      options.signal.throwIfAborted();
+      signal.throwIfAborted();
       const rawResult = await blueprint.handler(rawInput, context);
-      options.signal.throwIfAborted();
+      signal.throwIfAborted();
 
       let data: JsonValue;
       try {
@@ -439,7 +445,7 @@ function createExecuteCallback(
 
       return result;
     } catch (error) {
-      const aborted = isAbortError(error, options.signal);
+      const aborted = isAbortError(error, signal);
       const result: WebMcpToolResult = {
         ok: false,
         toolName: blueprint.name,

@@ -23,3 +23,5 @@ yarn-error.log*
 .netlify
 .playwright-cli
 /outputs
+/work/gridbrief-video
+/work/video-captures
