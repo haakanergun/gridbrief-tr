@@ -83,6 +83,13 @@ npm run build
 
 For a WebMCP verification, start the app in a supported browser-agent environment, open the workspace, and ask the agent to carry out the demo scenario. Confirm that the agent's calls visibly update the scope, snapshot, stress result, and draft; then edit an assumption manually and confirm the revised draft requires human approval.
 
+Fast judge walkthrough:
+
+1. Open the [live challenge demo](https://haakanergun.github.io/gridbrief-tr/) in ChatGPT's WebMCP-capable in-app browser, or in Chrome 149+ after enabling `chrome://flags/#enable-webmcp-testing` and restarting.
+2. Confirm the header says `WebMCP ready`, then click **Copy agent prompt** and give that instruction to the browser agent.
+3. Watch `DEMO TRACE` change to `WEBMCP TRACE` as the four tools update the visible scope, snapshot, stress result, and English draft.
+4. Click **Review & approve** yourself; approval is intentionally not exposed as an agent tool.
+
 The public build has also been exercised against Chrome 152's experimental WebMCP implementation: `getTools()` discovered all four tools and sequential `executeTool()` calls completed the scope, snapshot, stress, and draft flow without console errors.
 
 The market gateway can also be checked without a browser agent:
