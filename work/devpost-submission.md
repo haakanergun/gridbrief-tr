@@ -64,7 +64,7 @@ Next we would validate exact report semantics and usage permissions with EPİAŞ
 ## Links
 
 - Live application: [DEPLOYED_APP_URL]
-- Source code: [PUBLIC_REPOSITORY_URL]
+- Source code: https://github.com/haakanergun/gridbrief-tr
 - Demo video (under three minutes): [YOUTUBE_URL]
 
 ## Attribution and disclosures
