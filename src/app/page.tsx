@@ -277,7 +277,7 @@ export default function Home() {
       referencePrice: roundOne(referencePrice),
       adversePrice: roundOne(adversePrice),
       estimatedExposureTry: Math.round(Math.max(0, adverseSpread) * input.volumeMwh),
-      worstHour: findAdverseHour(latestSelectedPoints, input.direction),
+      contextPeakHour: findContextPeakHour(latestSelectedPoints, input.direction),
       calculation: `${input.volumeMwh} MWh × ${roundOne(Math.max(0, adverseSpread))} TRY/MWh adverse movement (${input.priceShockPercent}% scenario)`,
       disclaimer: "Illustrative what-if sensitivity, not a forecast, order recommendation, or settlement calculation.",
     };
@@ -448,7 +448,7 @@ export default function Home() {
             <div className="headline-metric">
               <span>Illustrative adverse exposure</span>
               <strong>{formatMaybeTry(stress.estimatedExposureTry)}</strong>
-              <small><ArrowDownRight size={14} /> Worst hour {stress.worstHour}</small>
+              <small><ArrowDownRight size={14} /> IDM context peak {stress.contextPeakHour}</small>
             </div>
           </div>
 
@@ -721,7 +721,7 @@ function isIsoCalendarDate(value: string): boolean {
     && parsed.getUTCDate() === day;
 }
 
-function findAdverseHour(points: MarketSnapshot["points"], side: PositionSide): string {
+function findContextPeakHour(points: MarketSnapshot["points"], side: PositionSide): string {
   let adverse: MarketSnapshot["points"][number] | undefined;
   for (const point of points) {
     if (!isFiniteNumber(point.idm)) continue;
@@ -751,13 +751,13 @@ function buildBriefSections(
   const texts = options.language === "tr"
     ? {
       market: `Piyasa: ${snapshot.scope.startHour}:00–${snapshot.scope.endHour}:00 penceresinde öne çıkan kanıtlar: ${signalSummary || "sıralanmış sinyal yok"}.`,
-      position: `Pozisyon: ${stress.positionMwh} MWh ${stress.side}; gösterge niteliğindeki olumsuz etki ${exposure}, yoğunlaşma saati ${stress.worstHour}.`,
+      position: `Pozisyon: ${stress.positionMwh} MWh ${stress.side}; gösterge niteliğindeki olumsuz etki ${exposure}; mevcut GİP bağlam zirvesi ${stress.contextPeakHour}.`,
       risks: `Riskler: ${snapshot.warnings?.length ? snapshot.warnings.join("; ") : "Kaynak zamanlarını ve portföye özgü kısıtları yeniden doğrulayın."}`,
       actions: `Aksiyonlar: ${options.audience} ekibi veri yayın saatlerini ve açık pozisyonu doğrulamalı; bu taslak otomatik işlem veya emir önerisi değildir.`,
     }
     : {
       market: `Market: leading evidence for ${snapshot.scope.startHour}:00–${snapshot.scope.endHour}:00 is ${signalSummary || "not yet ranked"}.`,
-      position: `Position: ${stress.positionMwh} MWh ${stress.side}; illustrative adverse exposure is ${exposure}, concentrated near ${stress.worstHour}.`,
+      position: `Position: ${stress.positionMwh} MWh ${stress.side}; illustrative adverse exposure is ${exposure}; the current IDM context peak is at ${stress.contextPeakHour}.`,
       risks: `Risks: ${snapshot.warnings?.length ? snapshot.warnings.join("; ") : "Re-check source timestamps and portfolio-specific constraints."}`,
       actions: `Actions: the ${options.audience} team should verify publication times and the open position; this draft is not an automated trade or order recommendation.`,
     };

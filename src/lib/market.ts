@@ -51,7 +51,7 @@ export interface StressResult {
   referencePrice: number | null;
   adversePrice: number | null;
   estimatedExposureTry: number | null;
-  worstHour: string;
+  contextPeakHour: string;
   calculation: string;
   disclaimer: string;
 }
@@ -105,7 +105,7 @@ export function calculateStress(
     adversePrice: adversePrice === null ? null : round(adversePrice),
     estimatedExposureTry:
       estimatedExposureTry === null ? null : Math.round(estimatedExposureTry),
-    worstHour: adversePoint?.hour ?? "—",
+    contextPeakHour: adversePoint?.hour ?? "—",
     calculation:
       spread === null
         ? "Unavailable: both PTF and IDM observations are required."
@@ -121,7 +121,7 @@ export function draftBrief(snapshot: MarketSnapshot, stress: StressResult): stri
     `Monitor the ${snapshot.scope.startHour}:00–${snapshot.scope.endHour}:00 delivery window; the current scenario is ${stress.positionMwh} MWh ${direction}.`,
     stress.estimatedExposureTry === null
       ? "Illustrative exposure is unavailable because the selected window is missing PTF or IDM observations."
-      : `Illustrative adverse exposure is ${formatTry(stress.estimatedExposureTry)}, concentrated near ${stress.worstHour}.`,
+      : `Illustrative adverse exposure is ${formatTry(stress.estimatedExposureTry)}; the selected-window IDM context peak is at ${stress.contextPeakHour}.`,
     topSignals.length
       ? `Primary evidence to re-check: ${topSignals.join("; ")}.`
       : "No ranked evidence is available yet; refresh the market snapshot before deciding.",
