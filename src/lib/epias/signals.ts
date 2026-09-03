@@ -10,7 +10,7 @@ function severityByRatio(ratio: number): SignalSeverity {
   return "watch";
 }
 
-function confidenceByCoverage(coverage: number): "high" | "medium" | "low" {
+function coverageLabel(coverage: number): "high" | "medium" | "low" {
   if (coverage >= 0.8) return "high";
   if (coverage >= 0.5) return "medium";
   return "low";
@@ -35,11 +35,12 @@ export function buildSignals(points: MarketPoint[]): MarketSignal[] {
       detail: `The gap between the lowest and highest PTF in the selected window is ${spread.toFixed(0)} TRY/MWh.`,
       metric: `${Math.round(spread * 100) / 100} TRY/MWh`,
       sourceTimestamp: peak.timestamp,
-      confidence: confidenceByCoverage(prices.length / points.length),
+      coverage: coverageLabel(prices.length / points.length),
     });
   }
 
   const deficitPoints = points.filter((point) => point.systemDirection === "SHORT");
+  const systemDirectionCoverage = points.filter((point) => point.systemDirection !== null).length / points.length;
   if (deficitPoints.length > 0) {
     signals.push({
       id: "system-deficit",
@@ -48,12 +49,14 @@ export function buildSignals(points: MarketPoint[]): MarketSignal[] {
       detail: `${deficitPoints.length} hours indicate an energy-short system. Balancing-market data can be about four hours delayed.`,
       metric: `${deficitPoints.length} hours`,
       sourceTimestamp: deficitPoints[0].timestamp,
-      confidence: "high",
+      coverage: coverageLabel(systemDirectionCoverage),
     });
   }
 
-  const tightest = points
-    .filter((point) => point.load !== null && point.generation !== null && point.load > 0)
+  const supplyPoints = points.filter(
+    (point) => point.load !== null && point.generation !== null && point.load > 0,
+  );
+  const tightest = supplyPoints
     .map((point) => ({ point, margin: ((point.generation as number) - (point.load as number)) / (point.load as number) }))
     .sort((a, b) => a.margin - b.margin)[0];
   if (tightest && tightest.margin < 0.03) {
@@ -64,7 +67,7 @@ export function buildSignals(points: MarketPoint[]): MarketSignal[] {
       detail: `The hourly generation–consumption margin is ${(tightest.margin * 100).toFixed(1)}% of load.`,
       metric: `${Math.round(tightest.margin * 10_000) / 100}%`,
       sourceTimestamp: tightest.point.timestamp,
-      confidence: "medium",
+      coverage: coverageLabel(supplyPoints.length / points.length),
     });
   }
 

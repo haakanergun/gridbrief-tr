@@ -28,7 +28,7 @@ export interface MarketSignal {
   detail: string;
   metric: string;
   sourceTimestamp: string;
-  confidence: "high" | "medium" | "low";
+  coverage: "high" | "medium" | "low";
 }
 
 export interface MarketSnapshot {

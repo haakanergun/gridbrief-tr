@@ -2,7 +2,7 @@ import "server-only";
 
 import { GatewayError } from "./errors";
 
-const AUTH_URL = "https://giris.epias.com.tr/cas/v1/tickets";
+const DEFAULT_AUTH_URL = "https://cas.epias.com.tr/cas/v1/tickets";
 const API_ROOT = "https://seffaflik.epias.com.tr/electricity-service";
 const TGT_LIFETIME_MS = 2 * 60 * 60 * 1_000;
 const TGT_SAFETY_WINDOW_MS = 5 * 60 * 1_000;
@@ -58,7 +58,8 @@ async function fetchWithTimeout(
 async function requestNewTicket(): Promise<string> {
   const { username, password } = credentials();
   const form = new URLSearchParams({ username, password });
-  const response = await fetchWithTimeout(AUTH_URL, {
+  const authUrl = process.env.EPTR_AUTH_URL?.trim() || DEFAULT_AUTH_URL;
+  const response = await fetchWithTimeout(authUrl, {
     method: "POST",
     headers: {
       Accept: "text/plain",

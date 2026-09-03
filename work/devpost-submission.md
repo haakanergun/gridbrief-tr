@@ -16,9 +16,11 @@ Energy-market participants must reconcile price, system, supply, and demand info
 
 Türkiye’s EPİAŞ Transparency Platform makes rich market information available to authorized users, but availability and publication timing vary by report. That makes provenance and freshness as important as the number on a chart. GridBrief TR is designed around that constraint instead of hiding it.
 
+The surrounding information surface is real and substantial: EPİAŞ's official [2025 Annual Report](https://www.epias.com.tr/wp-content/uploads/2026/04/4-FAALIYET-RAPORU-2025.pdf) says the Transparency Platform served 28,006 registered users through 181 report screens and 253 web services. These are EPİAŞ platform figures, not GridBrief user claims.
+
 ## What it does
 
-GridBrief TR is a decision-support workspace for a stated electricity-market exposure. In the challenge walkthrough, a participant is short 50 MWh for tomorrow between 17:00 and 22:00 (Türkiye time).
+GridBrief TR is a decision-support workspace for a stated electricity-market exposure. The challenge walkthrough is a synthetic next-day reference scenario dated 4 September 2026: a participant is short 50 MWh between 17:00 and 22:00 (Türkiye time).
 
 A browser agent uses the workspace's WebMCP tools to:
 
@@ -29,9 +31,11 @@ A browser agent uses the workspace's WebMCP tools to:
 
 The participant then changes an assumption, sees the stress result and draft update, and explicitly approves the brief. GridBrief neither places a trade nor exposes any execution tool.
 
-Each snapshot is marked with a source, retrieval/as-of time, and mode. In **Live EPİAŞ** mode, the gateway uses six verified reports: day-ahead PTF, balancing-market SMF, intraday weighted-average price, real-time consumption, real-time generation, and system direction. These reports are implemented from the official [EPİAŞ Electricity Service technical documentation](https://seffaflik.epias.com.tr/electricity-service/technical/tr/index.html). Partial upstream failures return null metrics and warnings; they are never filled with demo values. In **Synthetic demo** mode, deterministic demo data is visibly labelled `synthetic` and `not EPİAŞ`; it is never presented as live market data. Synthetic mode is used only when live credentials are not configured.
+Each snapshot is marked with a source, retrieval/as-of time, and mode. In **Live EPİAŞ** mode, the gateway has documentation-mapped adapters for six reports: day-ahead PTF, balancing-market SMF, intraday weighted-average price, real-time consumption, real-time generation, and system direction. These adapters follow the official [EPİAŞ Electricity Service technical documentation](https://seffaflik.epias.com.tr/electricity-service/technical/tr/index.html). Partial upstream failures return null metrics and warnings; they are never filled with demo values. In **Synthetic demo** mode, deterministic demo data is visibly labelled `synthetic` and `not EPİAŞ`; it is never presented as live market data. Synthetic mode is used only when live credentials are not configured.
 
-The public challenge deployment runs in synthetic demo mode so reviewers can reproduce the workflow without an EPİAŞ account. Its values are demonstration-only; a configured live deployment is a separate, authenticated mode.
+The public challenge deployment runs in synthetic demo mode so reviewers can reproduce the workflow without an EPİAŞ account. It does not retrieve, display, or redistribute EPİAŞ data. Its values are demonstration-only; the optional live gateway is intended only for a user operating under their own authorized EPİAŞ account and remains subject to EPİAŞ terms.
+
+Because the walkthrough's delivery window was future-dated when built, its synthetic observations demonstrate the human-agent interaction rather than claim future actuals. A production next-day view would anchor the delivery window on day-ahead PTF and appropriately licensed forecast/outage inputs, while delayed consumption, generation, SMF, and system direction would be shown only as current context. This temporal split is explicitly future work.
 
 ## How we used WebMCP
 
@@ -47,6 +51,8 @@ Before this workflow, creating a defensible brief meant manually carrying the sa
 
 The application keeps a single workspace state for position, delivery window, selected assumptions, snapshot, stress result, and draft brief. Its WebMCP registration maps the four safe actions—scope, snapshot, stress, and draft—to that state. This lets a compatible browser agent invoke the workflow and lets ordinary UI controls modify the exact same information.
 
+We verified the deployed workflow in Chrome 152's experimental WebMCP implementation: `getTools()` discovered all four registrations and sequential `executeTool()` calls completed the full flow without console errors.
+
 The data boundary is explicit. Live EPİAŞ requests use server-side configuration and a short-lived TGT authentication flow; credentials are never exposed to the browser. The server retains a TGT in memory for up to two hours with a five-minute renewal buffer. When credentials are absent, the app uses a deterministic synthetic fixture and labels it in the UI and output. A live request with a partial source failure yields a warning and null value rather than synthetic substitution. Each snapshot includes provenance and freshness metadata so a delayed, unavailable, or synthetic source cannot masquerade as real-time information.
 
 Stress results are simple disclosed sensitivities—exposure multiplied by a selected price move—not predictive models or trade recommendations. A final approval is a user action, not an agent call.
@@ -59,7 +65,7 @@ The design challenge was resisting a broad “AI market terminal.” A single, c
 
 ## What’s next
 
-Next we would validate exact report semantics and usage permissions with EPİAŞ, expand the adapter only for verified reports, add organization-level audit retention and role controls, and test the workflow with licensed market participants. We would also add data-quality checks and scenario libraries, while preserving the no-execution boundary unless separately designed, governed, and authorized.
+Before any production use, we would complete a formal review of exact report semantics, account authorization, and permitted storage, display, and redistribution under EPİAŞ terms. We would then validate the documentation-mapped adapters with authorized market participants; separate future-window PTF, forecast, and outage evidence from delayed actuals used as current context; add organization-level audit retention and role controls; and expand data-quality checks and scenario libraries. We would preserve the no-execution boundary unless separately designed, governed, and authorized.
 
 ## Links
 
@@ -69,4 +75,4 @@ Next we would validate exact report semantics and usage permissions with EPİAŞ
 
 ## Attribution and disclosures
 
-GridBrief TR is an independent prototype and is not affiliated with or endorsed by EPİAŞ. EPİAŞ Transparency Platform data is used only through appropriately configured access. In the demo, any result labelled `synthetic` is fabricated, deterministic sample data—not an EPİAŞ quote, forecast, or trading signal. The application provides decision support only; it does not trade or provide financial advice.
+GridBrief TR is an independent prototype and is not affiliated with or endorsed by EPİAŞ. The public demo does not retrieve, display, or redistribute EPİAŞ data. Any result labelled `synthetic` is fabricated, deterministic sample data—not an EPİAŞ quote, forecast, or trading signal. Optional live access requires the user's own authorized account and remains subject to EPİAŞ terms. The application provides decision support only; it does not trade or provide financial advice.

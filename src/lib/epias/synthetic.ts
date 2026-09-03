@@ -54,7 +54,7 @@ export function syntheticSnapshot(
       provider: "Synthetic demo generator (not EPİAŞ)",
       fetchedAt: options.fetchedAt ?? new Date().toISOString(),
       timezone: "Europe/Istanbul",
-      note: "SYNTHETIC DEMO: These values are not EPİAŞ data and must not be used for market decisions. The live gateway activates only when EPTR_USERNAME and EPTR_PASSWORD are configured server-side.",
+      note: "SYNTHETIC REPLAY: Fabricated next-day reference observations demonstrate the workflow. They are not EPİAŞ data or future actuals and must not be used for market decisions.",
     },
     scope: {
       date: request.date,

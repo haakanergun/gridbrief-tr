@@ -3,9 +3,9 @@
 ## Product and demo
 
 - [x] Public deployment works in clean desktop and mobile browsers: https://haakanergun.github.io/gridbrief-tr/
-- [x] Main scenario works: short 50 MWh, tomorrow 17:00–22:00 inclusive, snapshot, stress, draft, manual edit, human approval.
+- [x] Main scenario works: synthetic next-day reference dated 2026-09-04, short 50 MWh, 17:00–22:00 inclusive, snapshot, stress, draft, manual edit, human approval.
 - [x] WebMCP scenario uses the equivalent exclusive tool boundary: `startHour: 17`, `endHour: 23`.
-- [ ] WebMCP invocation is demonstrated in a compatible browser-agent environment.
+- [x] WebMCP invocation is verified in Chrome 152's experimental implementation; all four discovered tools execute successfully in sequence.
 - [x] No tool can execute or place an order.
 - [x] Synthetic data is used only when credentials are absent and is explicitly labelled `synthetic` / `not EPİAŞ`; a live failure shows warnings and null metrics instead.
 - [x] No EPİAŞ credentials, TGT, `.env`, or account data are in browser assets, git history, or repository. Re-check the screen recording before upload.

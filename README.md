@@ -2,7 +2,7 @@
 
 [Live challenge demo](https://haakanergun.github.io/gridbrief-tr/) · [OpenAI WebMCP Challenge](https://webmcp.devpost.com/)
 
-**GridBrief TR** is an agent-native risk workspace for participants in Türkiye's electricity market. It turns a market operator's question—such as “I am short 50 MWh tomorrow from 17:00 to 22:00; what should I watch?”—into a human-reviewable, source- and freshness-aware shift brief.
+**GridBrief TR** is an agent-native risk workspace for participants in Türkiye's electricity market. It turns a market operator's question—such as “I am short 50 MWh for the next delivery day from 17:00 to 22:00; what should I watch?”—into a human-reviewable, source- and freshness-aware shift brief.
 
 It is a decision-support prototype. It does not place orders, connect to a trading account, or recommend an execution. A human sets the exposure, changes assumptions, reviews the evidence, and explicitly approves a draft brief.
 
@@ -11,6 +11,8 @@ It is a decision-support prototype. It does not place orders, connect to a tradi
 ## Why WebMCP
 
 Energy-market analysis often alternates between a participant's browser, operator data pages, spreadsheets, and a chat. That loses the user's selected scope and makes it hard to see which source and timestamp support an answer.
+
+The information surface is substantial: EPİAŞ reports that its Transparency Platform served 28,006 registered users in 2025 through 181 report screens and 253 web services. Those figures describe the surrounding platform—not GridBrief's user count—and ground the workflow opportunity in a real operating context. See the official [EPİAŞ 2025 Annual Report](https://www.epias.com.tr/wp-content/uploads/2026/04/4-FAALIYET-RAPORU-2025.pdf).
 
 GridBrief exposes the current workspace as WebMCP tools so a browser agent can operate *with* the user instead of merely describing the page:
 
@@ -23,7 +25,7 @@ The agent does the repetitive retrieval and synthesis; the human remains respons
 
 ## Demo scenario
 
-The included demo begins with a **50 MWh short position for tomorrow, 17:00–22:00 (Türkiye time)**. The browser agent sets that scope, gathers the snapshot, runs a price stress, and drafts a brief. The user then changes an assumption and approves the revised brief. See [work/demo-script.md](work/demo-script.md).
+The included synthetic replay uses a **50 MWh short position for the next-day reference scenario dated 4 September 2026, 17:00–22:00 (Türkiye time)**. The browser agent sets that scope, gathers the labelled reference snapshot, runs a price stress, and drafts a brief. The user then changes an assumption and approves the revised brief. See [work/demo-script.md](work/demo-script.md).
 
 The visible UI and `POST /api/market` use an **inclusive** ending hour: `17` through `22` covers 17:00–22:59. WebMCP's `endHour` is an **exclusive** boundary, so the agent uses `startHour: 17, endHour: 23` for that same delivery range.
 
@@ -42,7 +44,11 @@ Data availability differs by report. A snapshot's retrieval timestamp and source
 
 GridBrief is not affiliated with EPİAŞ. EPİAŞ is the named source where applicable; the product does not use EPİAŞ branding as its own.
 
-The live gateway has verified adapters for six EPİAŞ Transparency Platform reports: day-ahead market PTF, balancing-market SMF, intraday-market weighted-average price, real-time consumption, real-time generation, and system direction. See the official [EPİAŞ Electricity Service technical documentation](https://seffaflik.epias.com.tr/electricity-service/technical/tr/index.html).
+The public challenge deployment neither retrieves nor redistributes EPİAŞ data. The optional server gateway is intended only for a user operating under their own authorized EPİAŞ account and remains subject to EPİAŞ terms and any applicable limits on use, storage, display, or redistribution.
+
+Because the walkthrough's delivery window is in the future relative to its build date, the synthetic observations demonstrate the collaboration flow; they are not claimed as future actuals. A production next-day view would use day-ahead PTF plus appropriately licensed forecast and outage inputs, while delayed consumption, generation, SMF, and system-direction observations would appear only as current context. That temporal split is future work, not a capability claimed by this prototype.
+
+The live gateway has documentation-mapped adapters for six EPİAŞ Transparency Platform reports: day-ahead market PTF, balancing-market SMF, intraday-market weighted-average price, real-time consumption, real-time generation, and system direction. See the official [EPİAŞ Electricity Service technical documentation](https://seffaflik.epias.com.tr/electricity-service/technical/tr/index.html). Complete a production and legal review before enabling live use.
 
 ## Run locally
 
@@ -64,7 +70,9 @@ EPTR_USERNAME=your_epias_username
 EPTR_PASSWORD=your_epias_password
 ```
 
-Live access is optional for the challenge demo. If configured live requests partially fail, the gateway returns warnings and null metrics. It does not downgrade a live request to synthetic data. Remove the credentials (or use a clean public deployment without them) for the explicitly labelled synthetic demo.
+The gateway defaults to EPİAŞ's current `https://cas.epias.com.tr/cas/v1/tickets` ticket endpoint, as specified in its [CAS ticket-service announcement](https://www.epias.com.tr/tum-duyurular/piyasa-duyurulari/elektrik/kayit-ve-uzlastirma/cas-uygulamasindaki-ticket-tgt-alma-servisinde-degisiklik-2/). `EPTR_AUTH_URL` can override that server-side if EPİAŞ supplies an account-specific or future endpoint; never expose it with a `NEXT_PUBLIC_` prefix.
+
+Live access is optional for the challenge demo. If configured live requests partially fail, the gateway returns warnings and null metrics. It does not downgrade a live request to synthetic data. Remove the credentials (or use a clean public deployment without them) for the explicitly labelled synthetic demo. The adapter has not been authenticated end-to-end in this public, credential-free challenge build.
 
 ## Test
 
@@ -74,6 +82,8 @@ npm run build
 ```
 
 For a WebMCP verification, start the app in a supported browser-agent environment, open the workspace, and ask the agent to carry out the demo scenario. Confirm that the agent's calls visibly update the scope, snapshot, stress result, and draft; then edit an assumption manually and confirm the revised draft requires human approval.
+
+The public build has also been exercised against Chrome 152's experimental WebMCP implementation: `getTools()` discovered all four tools and sequential `executeTool()` calls completed the scope, snapshot, stress, and draft flow without console errors.
 
 The market gateway can also be checked without a browser agent:
 

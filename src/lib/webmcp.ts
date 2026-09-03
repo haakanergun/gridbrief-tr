@@ -26,7 +26,6 @@ export type MarketMetric =
   | "idm"
   | "consumption"
   | "generation"
-  | "renewables"
   | "system_direction";
 
 export interface MarketSnapshotInput {
@@ -185,7 +184,7 @@ const toolBlueprints = (handlers: WebMcpHandlers): ToolBlueprint[] => [
           type: "array",
           minItems: 1,
           uniqueItems: true,
-          maxItems: 7,
+          maxItems: 6,
           description:
             "Metrics to retrieve. Omit to return the workspace's default market overview.",
           items: {
@@ -196,7 +195,6 @@ const toolBlueprints = (handlers: WebMcpHandlers): ToolBlueprint[] => [
               "idm",
               "consumption",
               "generation",
-              "renewables",
               "system_direction",
             ],
           },
@@ -215,7 +213,7 @@ const toolBlueprints = (handlers: WebMcpHandlers): ToolBlueprint[] => [
       },
     },
     annotations: {
-      readOnlyHint: true,
+      readOnlyHint: false,
       untrustedContentHint: true,
     },
     handler: (input, context) =>
@@ -284,7 +282,7 @@ const toolBlueprints = (handlers: WebMcpHandlers): ToolBlueprint[] => [
         language: {
           type: "string",
           enum: ["tr", "en"],
-          default: "tr",
+          default: "en",
           description: "Language of the draft brief.",
         },
         audience: {

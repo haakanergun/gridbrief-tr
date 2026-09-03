@@ -85,6 +85,7 @@ export default function Home() {
   const [approved, setApproved] = useState(false);
   const [copied, setCopied] = useState(false);
   const [activity, setActivity] = useState<ActivityItem[]>(STARTING_ACTIVITY);
+  const [traceLabel, setTraceLabel] = useState("DEMO TRACE");
   const [gatewayError, setGatewayError] = useState<string | null>(null);
   const analysisRequestRef = useRef(0);
   const latestStateRef = useRef({ scope, snapshot, stress });
@@ -181,6 +182,7 @@ export default function Home() {
   }, []);
 
   const handleWebMcpActivity = useCallback((event: WebMcpActivityEvent) => {
+    setTraceLabel("WEBMCP TRACE");
     const tool = TOOL_ACTIVITY[event.toolName];
     const status: ActivityItem["status"] = event.phase === "started" ? "active" : event.phase === "succeeded" ? "done" : "waiting";
     const detail = event.phase === "started"
@@ -228,9 +230,6 @@ export default function Home() {
     }, latestScope);
     const result = await runAnalysis(nextScope, context.signal);
     const metrics = input.metrics ?? ["ptf", "smf", "idm", "consumption", "generation", "system_direction"];
-    const projectionWarnings = input.metrics?.includes("renewables")
-      ? ["Renewables are not exposed by this prototype snapshot contract; returned renewables values are null."]
-      : [];
 
     return toJsonValue({
       status: "snapshot_ready",
@@ -239,7 +238,7 @@ export default function Home() {
       observations: projectMarketPoints(result.snapshot, input.metrics, startHour, exclusiveEndHour),
       rankedSignals: result.snapshot.signals,
       source: sourceAttribution(result.snapshot),
-      warnings: [...(result.snapshot.warnings ?? []), ...projectionWarnings],
+      warnings: result.snapshot.warnings ?? [],
       safety: "Read-only market evidence. Publication delays apply; this is not an executable quote.",
     });
   }, [runAnalysis]);
@@ -298,7 +297,7 @@ export default function Home() {
   const draftShiftBriefTool = useCallback((input: DraftShiftBriefInput, context: WebMcpExecutionContext): JsonValue => {
     context.signal.throwIfAborted();
     const latest = latestStateRef.current;
-    const language = input.language ?? "tr";
+    const language = input.language ?? "en";
     const audience = input.audience ?? "trader";
     const sections = input.includeSections?.length ? input.includeSections : [...ALL_BRIEF_SECTIONS];
     const sectionText = buildBriefSections({ language, audience, sections, notes: input.notes }, latest.snapshot, latest.stress);
@@ -327,6 +326,7 @@ export default function Home() {
 
   function submitScope(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setTraceLabel("LOCAL RUN");
     void runAnalysis(scope).catch(() => undefined);
   }
 
@@ -364,7 +364,10 @@ export default function Home() {
         <aside className="scope-rail">
           <div className="rail-heading">
             <span className="eyebrow">ANALYSIS SCOPE</span>
-            <button className="icon-button" type="button" title="Reset scope" onClick={() => void runAnalysis(DEFAULT_SCOPE).catch(() => undefined)}>
+            <button className="icon-button" type="button" title="Reset scope" onClick={() => {
+              setTraceLabel("LOCAL RUN");
+              void runAnalysis(DEFAULT_SCOPE).catch(() => undefined);
+            }}>
               <RefreshCw size={15} />
             </button>
           </div>
@@ -520,7 +523,7 @@ export default function Home() {
                   </div>
                   <strong>{signal.metric}</strong>
                   <div className="signal-meta">
-                    <span>{signal.confidence} confidence</span>
+                    <span>{signal.coverage} data coverage</span>
                     <time>{formatTimestamp(signal.sourceTimestamp)}</time>
                   </div>
                   <ChevronRight size={17} />
@@ -536,7 +539,7 @@ export default function Home() {
               <span className="eyebrow">AGENT WORKBENCH</span>
               <h2>Shared trace</h2>
             </div>
-            <span className="trace-live"><i /> ACTIVE</span>
+            <span className="trace-live"><i /> {traceLabel}</span>
           </div>
 
           <div className="activity-list">
@@ -694,7 +697,6 @@ function projectMarketPoints(
       if (metricName === "consumption") observation.consumption = point.load;
       if (metricName === "generation") observation.generation = point.generation;
       if (metricName === "system_direction") observation.systemDirection = point.systemDirection;
-      if (metricName === "renewables") observation.renewables = null;
     }
     return observation;
   });
