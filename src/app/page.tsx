@@ -331,7 +331,7 @@ export default function Home() {
   }
 
   async function copyAgentPrompt() {
-    const prompt = `Use this page's WebMCP tools to analyze a ${scope.positionMwh} MWh ${scope.side} position for ${scope.date}, delivery hours ${scope.startHour}:00 through ${scope.endHour}:59 (use exclusive endHour ${scope.endHour + 1} in tool calls). Show the evidence, stress the exposure, and draft a shift brief for my review. Do not place or recommend a trade.`;
+    const prompt = `Use this page's WebMCP tools to analyze a ${scope.positionMwh} MWh ${scope.side} position for ${scope.date}, delivery hours ${scope.startHour}:00 through ${scope.endHour}:59 (use exclusive endHour ${scope.endHour + 1} in tool calls). Show the evidence, stress the position with a 20% upward price shock, and draft an English shift brief for operations review. Do not place or recommend a trade.`;
     await navigator.clipboard.writeText(prompt);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1800);
