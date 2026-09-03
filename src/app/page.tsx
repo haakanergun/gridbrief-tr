@@ -194,6 +194,7 @@ export default function Home() {
 
       const health = await response.json() as { mode?: unknown };
       if (health.mode !== "live") return;
+      if (analysisRequestRef.current !== 0) return;
 
       await runAnalysis(
         { ...DEFAULT_SCOPE, date: previousIstanbulDate() },

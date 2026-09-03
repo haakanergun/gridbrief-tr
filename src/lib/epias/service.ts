@@ -1,4 +1,4 @@
-import { fetchEpiasItems, getEpiasConfigurationStatus } from "./client";
+import { ensureEpiasTicket, fetchEpiasItems, getEpiasConfigurationStatus } from "./client";
 import { GatewayError } from "./errors";
 import { buildSignals } from "./signals";
 import { syntheticSnapshot } from "./synthetic";
@@ -102,6 +102,7 @@ function normalizeSystemDirection(value: number | string | null): SystemDirectio
   if (
     normalized === "short" ||
     normalized.includes("açık") ||
+    normalized.includes("açığ") ||
     normalized.includes("deficit") ||
     normalized.includes("negatif")
   ) {
@@ -158,6 +159,7 @@ const DEFAULT_CACHE_SECONDS = 120;
 const MIN_CACHE_SECONDS = 30;
 const MAX_CACHE_SECONDS = 900;
 const MAX_CACHED_DAYS = 16;
+const MAX_CONCURRENT_UPSTREAM_REQUESTS = 1;
 
 function cacheLifetimeMs(): number {
   const configured = Number(process.env.EPTR_DATA_CACHE_SECONDS);
@@ -180,6 +182,7 @@ function trimLiveDayCache(now: number): void {
 }
 
 async function fetchLiveDay(date: string): Promise<LiveDaySnapshot> {
+  await ensureEpiasTicket();
 
   const query = {
     startDate: epiasDate(date, 0),
@@ -191,12 +194,30 @@ async function fetchLiveDay(date: string): Promise<LiveDaySnapshot> {
     },
   };
 
-  const settled = await Promise.allSettled(
-    ENDPOINTS.map(async (endpoint) => ({
-      endpoint,
-      items: await fetchEpiasItems(endpoint.path, query),
-    })),
-  );
+  const settled: PromiseSettledResult<{
+    endpoint: EndpointDefinition;
+    items: Record<string, unknown>[];
+  }>[] = [];
+
+  for (let index = 0; index < ENDPOINTS.length; index += MAX_CONCURRENT_UPSTREAM_REQUESTS) {
+    const batch = ENDPOINTS.slice(index, index + MAX_CONCURRENT_UPSTREAM_REQUESTS);
+    const batchResults = await Promise.allSettled(
+      batch.map(async (endpoint) => ({
+        endpoint,
+        items: await fetchEpiasItems(endpoint.path, query),
+      })),
+    );
+
+    const authenticationFailure = batchResults.find(
+      (result): result is PromiseRejectedResult =>
+        result.status === "rejected"
+        && result.reason instanceof GatewayError
+        && result.reason.code === "UPSTREAM_AUTH_FAILED",
+    );
+    if (authenticationFailure) throw authenticationFailure.reason;
+
+    settled.push(...batchResults);
+  }
 
   const points = emptyPoints(date);
   const byHour = new Map(points.map((point) => [Number(point.hour.slice(0, 2)), point]));
@@ -288,7 +309,11 @@ async function getLiveDay(date: string): Promise<LiveDaySnapshot> {
   const request = fetchLiveDay(date)
     .then((value) => {
       trimLiveDayCache(Date.now());
-      liveDayCache.set(date, { value, expiresAt: Date.now() + cacheLifetimeMs() });
+      const fullCacheLifetime = cacheLifetimeMs();
+      const cacheLifetime = value.warnings.length > 0
+        ? Math.min(fullCacheLifetime, MIN_CACHE_SECONDS * 1_000)
+        : fullCacheLifetime;
+      liveDayCache.set(date, { value, expiresAt: Date.now() + cacheLifetime });
       return value;
     })
     .finally(() => {
