@@ -18,7 +18,7 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react";
-import { type FormEvent, useCallback, useMemo, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MarketChart } from "@/components/MarketChart";
 import { useWebMcp } from "@/hooks/useWebMcp";
 import { createDemoSnapshot } from "@/lib/demo";
@@ -180,6 +180,35 @@ export default function Home() {
       if (requestId === analysisRequestRef.current) setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (STATIC_DEMO_MODE) return;
+
+    const controller = new AbortController();
+    async function initializeAuthorizedLiveMode() {
+      const response = await fetch("/api/health", {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      if (!response.ok) return;
+
+      const health = await response.json() as { mode?: unknown };
+      if (health.mode !== "live") return;
+
+      await runAnalysis(
+        { ...DEFAULT_SCOPE, date: previousIstanbulDate() },
+        controller.signal,
+      );
+    }
+
+    void initializeAuthorizedLiveMode().catch((error: unknown) => {
+      if (!isAbortException(error)) {
+        // runAnalysis already preserves the last valid snapshot and displays its public error.
+      }
+    });
+
+    return () => controller.abort();
+  }, [runAnalysis]);
 
   const handleWebMcpActivity = useCallback((event: WebMcpActivityEvent) => {
     setTraceLabel("WEBMCP TRACE");
@@ -601,6 +630,19 @@ function formatTimestamp(value: string): string {
     hour12: false,
     timeZone: "Europe/Istanbul",
   }).format(parsed);
+}
+
+function previousIstanbulDate(now = new Date()): string {
+  const completedDay = new Date(now.getTime() - 24 * 60 * 60 * 1_000);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Europe/Istanbul",
+  }).formatToParts(completedDay);
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  return `${value("year")}-${value("month")}-${value("day")}`;
 }
 
 function isFiniteNumber(value: unknown): value is number {

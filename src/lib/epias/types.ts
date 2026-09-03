@@ -52,14 +52,3 @@ export interface MarketSnapshot {
   signals: MarketSignal[];
   warnings: string[];
 }
-
-export interface EpiasHealth {
-  status: "ok";
-  service: "gridbrief-market-gateway";
-  mode: MarketMode;
-  epiasConfigured: boolean;
-  timestamp: string;
-  checks: {
-    credentials: "configured" | "missing";
-  };
-}

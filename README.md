@@ -35,8 +35,8 @@ GridBrief distinguishes its modes in the interface and in every brief:
 
 | Mode | What it means |
 | --- | --- |
-| Live EPİAŞ | When both server-only credentials are configured, the gateway retrieves supported EPİAŞ Transparency Platform reports. A source and retrieval timestamp are attached to the snapshot. An individual upstream failure is returned as a null field plus a warning—never silently replaced with synthetic data. |
-| Synthetic demo | Deterministic, clearly labelled demo data is used **only when EPİAŞ credentials are absent**. It is for workflow demonstration only and must not be interpreted as market data. |
+| Live EPİAŞ | When live mode is explicitly enabled and both server-only credentials are configured, the gateway retrieves supported EPİAŞ Transparency Platform reports. A source and retrieval timestamp are attached to the snapshot. An individual upstream failure is returned as a null field plus a warning—never silently replaced with synthetic data. |
+| Synthetic demo | Deterministic, clearly labelled demo data is used while the server-only live-mode switch is disabled. It is for workflow demonstration only and must not be interpreted as market data. |
 
 EPİAŞ access requires a registered Transparency Platform account and an authentication token (TGT). The server obtains the TGT through EPİAŞ authentication, retains it only in server memory for up to two hours (with a five-minute renewal buffer), and never returns or logs the credential or TGT. Do not put credentials or tokens in browser code, prompts, screenshots, commits, or public deployments.
 
@@ -63,16 +63,23 @@ Open the local URL printed by the dev server. Use **Demo / synthetic** mode for 
 
 ### Optional live EPİAŞ configuration
 
-Create a local `.env` file from `.env.example`, then supply the server-only EPİAŞ values below. Never prefix them with `NEXT_PUBLIC_` and never commit `.env`.
+Create a local `.env.local` file from `.env.example`, then supply the server-only values below. Never prefix them with `NEXT_PUBLIC_` and never commit `.env.local`. The separate switch prevents accidentally enabling live traffic merely by leaving credentials in an environment.
 
 ```bash
+EPTR_LIVE_ENABLED=true
 EPTR_USERNAME=your_epias_username
 EPTR_PASSWORD=your_epias_password
+GRIDBRIEF_ACCESS_USERNAME=choose_a_judge_username
+GRIDBRIEF_ACCESS_PASSWORD=choose_a_long_random_password
 ```
+
+When live mode is enabled, production requests fail closed unless the access username and password are also configured. The root page and API are protected with HTTP Basic authentication; put those **GridBrief access credentials**, never the EPİAŞ credentials, in the Devpost testing instructions. The market route also checks same-origin browser requests, applies a best-effort per-instance rate limit, caps the actual UTF-8 request size, and caches a fetched market day briefly in server memory. These controls reduce exposure but do not replace the hosting provider's access protection or a shared production-grade rate-limit store.
+
+After an authorized live page loads, the client checks the gateway configuration and automatically requests the preceding completed Türkiye-market day. This replaces the initial replay snapshot with source-attributed EPİAŞ results when the credentialed request succeeds; the normal warning state remains visible if authentication or an upstream report fails.
 
 The gateway defaults to EPİAŞ's current `https://cas.epias.com.tr/cas/v1/tickets` ticket endpoint, as specified in its [CAS ticket-service announcement](https://www.epias.com.tr/tum-duyurular/piyasa-duyurulari/elektrik/kayit-ve-uzlastirma/cas-uygulamasindaki-ticket-tgt-alma-servisinde-degisiklik-2/). `EPTR_AUTH_URL` can override that server-side if EPİAŞ supplies an account-specific or future endpoint; never expose it with a `NEXT_PUBLIC_` prefix.
 
-Live access is optional for the challenge demo. If configured live requests partially fail, the gateway returns warnings and null metrics. It does not downgrade a live request to synthetic data. Remove the credentials (or use a clean public deployment without them) for the explicitly labelled synthetic demo. The adapter has not been authenticated end-to-end in this public, credential-free challenge build.
+Live access is optional for the challenge demo. If configured live requests partially fail, the gateway returns warnings and null metrics. It does not downgrade a live request to synthetic data. Set `EPTR_LIVE_ENABLED=false` for the explicitly labelled synthetic demo. Do not claim live verification until a request has succeeded with an authorized account.
 
 ## Test
 
@@ -96,8 +103,10 @@ The market gateway can also be checked without a browser agent:
 
 ```bash
 curl http://localhost:3000/api/health
-curl -X POST http://localhost:3000/api/market -H "Content-Type: application/json" -d '{"date":"2026-09-04","startHour":17,"endHour":22,"positionMwh":50,"side":"short"}'
+curl --user "judge:your_gridbrief_access_password" -X POST http://localhost:3000/api/market -H "Origin: http://localhost:3000" -H "Content-Type: application/json" -d '{"date":"2026-09-02","startHour":17,"endHour":22,"positionMwh":50,"side":"short"}'
 ```
+
+Use a completed historical date for the first authorized smoke test so delayed actual reports can be validated. A next-day date may legitimately contain PTF while GİP, SMF, system direction, consumption, or generation remain unavailable.
 
 ## Deploy
 
@@ -107,11 +116,11 @@ Deploy the app to a Node-compatible host using the repository's standard build c
 npm run build
 ```
 
-Add server-only EPİAŞ secrets only in the host’s encrypted environment configuration. The public challenge deployment runs in synthetic mode with no EPİAŞ secret configured. Before sharing a Node-compatible deployment, test the deployed URL, `GET /api/health`, the WebMCP tool registration, mode labels, and the no-secrets synthetic path.
+Add all server-only secrets only in the host’s encrypted environment configuration. Do not set `GITHUB_PAGES` or `NEXT_PUBLIC_STATIC_DEMO` on the Node deployment. The public GitHub Pages challenge deployment remains synthetic and has no EPİAŞ secret. Before sharing the protected Node deployment, test a completed historical date, `GET /api/health`, the WebMCP tool registration, mode labels, partial-data warnings, and the kill-switch synthetic path.
 
 ### GitHub Pages fallback
 
-The repository includes a GitHub Actions workflow that publishes the [public challenge demo](https://haakanergun.github.io/gridbrief-tr/) as a static, synthetic-only build. The workflow removes server-only API routes in its disposable checkout, builds with `GITHUB_PAGES=true` and `NEXT_PUBLIC_STATIC_DEMO=true`, and deploys the generated `out` directory. In this build only, form and WebMCP refreshes generate the same deterministic, clearly labelled synthetic snapshot directly in the browser; standard local and Node-compatible deployments continue to use `POST /api/market` unchanged. The Pages fallback intentionally has no `/api/*` endpoints.
+The repository includes a GitHub Actions workflow that publishes the [public challenge demo](https://haakanergun.github.io/gridbrief-tr/) as a static, synthetic-only build. The workflow removes server-only API routes and the unsupported request proxy in its disposable checkout, builds with `GITHUB_PAGES=true` and `NEXT_PUBLIC_STATIC_DEMO=true`, and deploys the generated `out` directory. In this build only, form and WebMCP refreshes generate the same deterministic, clearly labelled synthetic snapshot directly in the browser; standard local and Node-compatible deployments continue to use `POST /api/market` unchanged. The Pages fallback intentionally has no `/api/*` endpoints.
 
 ## Project notes
 

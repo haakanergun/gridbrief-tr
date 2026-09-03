@@ -1,5 +1,6 @@
 export type GatewayErrorCode =
   | "INVALID_REQUEST"
+  | "GATEWAY_MISCONFIGURED"
   | "UPSTREAM_AUTH_FAILED"
   | "UPSTREAM_TIMEOUT"
   | "UPSTREAM_UNAVAILABLE"
@@ -31,4 +32,3 @@ export function publicError(error: unknown): {
     status: 502,
   };
 }
-

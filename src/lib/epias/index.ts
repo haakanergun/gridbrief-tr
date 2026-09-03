@@ -1,9 +1,12 @@
 export { GatewayError, publicError } from "./errors";
 export { getMarketSnapshot } from "./service";
-export { hasEpiasCredentials } from "./client";
+export {
+  getEpiasConfigurationStatus,
+  hasEpiasCredentials,
+  type EpiasConfigurationStatus,
+} from "./client";
 export { parseMarketRequest } from "./validation";
 export type {
-  EpiasHealth,
   MarketMode,
   MarketPoint,
   MarketRequest,

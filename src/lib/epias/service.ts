@@ -1,4 +1,4 @@
-import { fetchEpiasItems, hasEpiasCredentials } from "./client";
+import { fetchEpiasItems, getEpiasConfigurationStatus } from "./client";
 import { GatewayError } from "./errors";
 import { buildSignals } from "./signals";
 import { syntheticSnapshot } from "./synthetic";
@@ -119,11 +119,11 @@ function normalizeSystemDirection(value: number | string | null): SystemDirectio
   return null;
 }
 
-function emptyPoints(request: MarketRequest): MarketPoint[] {
+function emptyPoints(date: string): MarketPoint[] {
   const points: MarketPoint[] = [];
   for (let hour = 0; hour <= 23; hour += 1) {
     points.push({
-      timestamp: hourTimestamp(request.date, hour),
+      timestamp: hourTimestamp(date, hour),
       hour: `${hour.toString().padStart(2, "0")}:00`,
       ptf: null,
       smf: null,
@@ -141,12 +141,49 @@ function errorSummary(error: unknown): string {
   return "Unknown upstream failure.";
 }
 
-export async function getMarketSnapshot(request: MarketRequest): Promise<MarketSnapshot> {
-  if (!hasEpiasCredentials()) return syntheticSnapshot(request);
+interface LiveDaySnapshot {
+  points: MarketPoint[];
+  warnings: string[];
+  fetchedAt: string;
+}
+
+interface CachedLiveDay {
+  value: LiveDaySnapshot;
+  expiresAt: number;
+}
+
+const liveDayCache = new Map<string, CachedLiveDay>();
+const pendingLiveDays = new Map<string, Promise<LiveDaySnapshot>>();
+const DEFAULT_CACHE_SECONDS = 120;
+const MIN_CACHE_SECONDS = 30;
+const MAX_CACHE_SECONDS = 900;
+const MAX_CACHED_DAYS = 16;
+
+function cacheLifetimeMs(): number {
+  const configured = Number(process.env.EPTR_DATA_CACHE_SECONDS);
+  const seconds = Number.isFinite(configured)
+    ? Math.min(MAX_CACHE_SECONDS, Math.max(MIN_CACHE_SECONDS, configured))
+    : DEFAULT_CACHE_SECONDS;
+  return seconds * 1_000;
+}
+
+function trimLiveDayCache(now: number): void {
+  for (const [date, cached] of liveDayCache) {
+    if (cached.expiresAt <= now) liveDayCache.delete(date);
+  }
+
+  while (liveDayCache.size >= MAX_CACHED_DAYS) {
+    const oldestDate = liveDayCache.keys().next().value as string | undefined;
+    if (!oldestDate) break;
+    liveDayCache.delete(oldestDate);
+  }
+}
+
+async function fetchLiveDay(date: string): Promise<LiveDaySnapshot> {
 
   const query = {
-    startDate: epiasDate(request.date, 0),
-    endDate: epiasDate(request.date, 23),
+    startDate: epiasDate(date, 0),
+    endDate: epiasDate(date, 23),
     page: {
       number: 1,
       size: 100,
@@ -161,7 +198,7 @@ export async function getMarketSnapshot(request: MarketRequest): Promise<MarketS
     })),
   );
 
-  const points = emptyPoints(request);
+  const points = emptyPoints(date);
   const byHour = new Map(points.map((point) => [Number(point.hour.slice(0, 2)), point]));
   const warnings: string[] = [];
   let successfulEndpoints = 0;
@@ -233,24 +270,67 @@ export async function getMarketSnapshot(request: MarketRequest): Promise<MarketS
     }
   }
 
+  return { points, warnings, fetchedAt: new Date().toISOString() };
+}
+
+async function getLiveDay(date: string): Promise<LiveDaySnapshot> {
+  const now = Date.now();
+  const cached = liveDayCache.get(date);
+  if (cached && cached.expiresAt > now) {
+    liveDayCache.delete(date);
+    liveDayCache.set(date, cached);
+    return cached.value;
+  }
+
+  const pending = pendingLiveDays.get(date);
+  if (pending) return pending;
+
+  const request = fetchLiveDay(date)
+    .then((value) => {
+      trimLiveDayCache(Date.now());
+      liveDayCache.set(date, { value, expiresAt: Date.now() + cacheLifetimeMs() });
+      return value;
+    })
+    .finally(() => {
+      pendingLiveDays.delete(date);
+    });
+
+  pendingLiveDays.set(date, request);
+  return request;
+}
+
+export async function getMarketSnapshot(request: MarketRequest): Promise<MarketSnapshot> {
+  const configuration = getEpiasConfigurationStatus();
+  if (configuration === "disabled") return syntheticSnapshot(request);
+  if (configuration === "misconfigured") {
+    throw new GatewayError(
+      "GATEWAY_MISCONFIGURED",
+      "Live EPİAŞ access is enabled but its server configuration is incomplete.",
+      503,
+    );
+  }
+
+  const liveDay = await getLiveDay(request.date);
+  const selectedPoints = liveDay.points.filter((point) => {
+    const hour = Number(point.hour.slice(0, 2));
+    return hour >= request.startHour && hour <= request.endHour;
+  });
+
   return {
     mode: "live",
     source: {
       provider: "EPİAŞ Şeffaflık Platformu 2.0",
-      fetchedAt: new Date().toISOString(),
+      fetchedAt: liveDay.fetchedAt,
       timezone: "Europe/Istanbul",
-      note: "Canlı EPİAŞ servisleri. Birimler: fiyat TL/MWh; tüketim ve üretim MWh. SMF ve sistem yönü yaklaşık 4 saat, tüketim yaklaşık 2 saat gecikmeli olabilir; üretim verisi en geç önceki gün için yayımlanabilir.",
+      note: "Live EPİAŞ services. Units: prices TRY/MWh; consumption and generation MWh. SMF and system direction can be about four hours delayed, consumption about two hours delayed, and generation may be published only through the preceding day. GridBrief scenarios are derived analysis, not EPİAŞ forecasts.",
     },
     scope: {
       date: request.date,
       startHour: request.startHour,
       endHour: request.endHour,
     },
-    points,
-    signals: buildSignals(points.filter((point) => {
-      const hour = Number(point.hour.slice(0, 2));
-      return hour >= request.startHour && hour <= request.endHour;
-    })),
-    warnings,
+    points: liveDay.points,
+    signals: buildSignals(selectedPoints),
+    warnings: liveDay.warnings,
   };
 }

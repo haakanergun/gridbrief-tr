@@ -8,6 +8,8 @@ const TGT_LIFETIME_MS = 2 * 60 * 60 * 1_000;
 const TGT_SAFETY_WINDOW_MS = 5 * 60 * 1_000;
 const REQUEST_TIMEOUT_MS = 8_000;
 
+export type EpiasConfigurationStatus = "disabled" | "ready" | "misconfigured";
+
 interface CachedTicket {
   value: string;
   expiresAt: number;
@@ -17,7 +19,15 @@ let cachedTicket: CachedTicket | null = null;
 let pendingTicket: Promise<string> | null = null;
 
 export function hasEpiasCredentials(): boolean {
-  return Boolean(process.env.EPTR_USERNAME?.trim() && process.env.EPTR_PASSWORD);
+  return getEpiasConfigurationStatus() === "ready";
+}
+
+export function getEpiasConfigurationStatus(): EpiasConfigurationStatus {
+  if (process.env.EPTR_LIVE_ENABLED !== "true") return "disabled";
+
+  const hasUsername = Boolean(process.env.EPTR_USERNAME?.trim());
+  const hasPassword = Boolean(process.env.EPTR_PASSWORD);
+  return hasUsername && hasPassword ? "ready" : "misconfigured";
 }
 
 function credentials(): { username: string; password: string } {
@@ -26,8 +36,8 @@ function credentials(): { username: string; password: string } {
 
   if (!username || !password) {
     throw new GatewayError(
-      "UPSTREAM_AUTH_FAILED",
-      "EPİAŞ credentials are not configured.",
+      "GATEWAY_MISCONFIGURED",
+      "Live EPİAŞ access is enabled but its server credentials are incomplete.",
       503,
     );
   }
