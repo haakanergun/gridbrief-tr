@@ -1,0 +1,9 @@
+# Local research, captures, and generated deliverables are not application source.
+/work/
+/outputs/
+/.playwright-cli/
+/out/
+/*.tsbuildinfo
+
+# Never upload local environment files; production values live in Vercel.
+/.env*
