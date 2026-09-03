@@ -88,7 +88,11 @@ Deploy the app to a Node-compatible host using the repository's standard build c
 npm run build
 ```
 
-Add server-only EPİAŞ secrets only in the host’s encrypted environment configuration. The public challenge deployment is expected to run in synthetic mode with no EPİAŞ secret configured; it can do so safely. Before sharing, test the deployed URL, `GET /api/health`, the WebMCP tool registration, mode labels, and the no-secrets synthetic path.
+Add server-only EPİAŞ secrets only in the host’s encrypted environment configuration. The public challenge deployment is expected to run in synthetic mode with no EPİAŞ secret configured; it can do so safely. Before sharing a Node-compatible deployment, test the deployed URL, `GET /api/health`, the WebMCP tool registration, mode labels, and the no-secrets synthetic path.
+
+### GitHub Pages fallback
+
+The repository includes a GitHub Actions workflow that publishes a static, synthetic-only demo at `/gridbrief-tr`. The workflow removes server-only API routes in its disposable checkout, builds with `GITHUB_PAGES=true` and `NEXT_PUBLIC_STATIC_DEMO=true`, and deploys the generated `out` directory. In this build only, form and WebMCP refreshes generate the same deterministic, clearly labelled synthetic snapshot directly in the browser; standard local and Node-compatible deployments continue to use `POST /api/market` unchanged. The Pages fallback intentionally has no `/api/*` endpoints.
 
 ## Project notes
 

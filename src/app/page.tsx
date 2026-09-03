@@ -67,6 +67,7 @@ const TOOL_ACTIVITY: Record<WebMcpToolName, Pick<ActivityItem, "id" | "label">> 
 };
 
 const ALL_BRIEF_SECTIONS = ["market", "position", "risks", "actions"] as const;
+const STATIC_DEMO_MODE = process.env.NEXT_PUBLIC_STATIC_DEMO === "true";
 
 export default function Home() {
   const [scope, setScope] = useState<AnalysisScope>(DEFAULT_SCOPE);
@@ -127,14 +128,20 @@ export default function Home() {
     ]);
 
     try {
-      const response = await fetch("/api/market", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(nextScope),
-        signal,
-      });
-      if (!response.ok) throw new Error(await readGatewayError(response));
-      const nextSnapshot = (await response.json()) as MarketSnapshot;
+      let nextSnapshot: MarketSnapshot;
+      if (STATIC_DEMO_MODE) {
+        signal?.throwIfAborted();
+        nextSnapshot = createDemoSnapshot(nextScope);
+      } else {
+        const response = await fetch("/api/market", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(nextScope),
+          signal,
+        });
+        if (!response.ok) throw new Error(await readGatewayError(response));
+        nextSnapshot = (await response.json()) as MarketSnapshot;
+      }
       signal?.throwIfAborted();
 
       const nextStress = calculateStress(nextSnapshot, nextScope.positionMwh, nextScope.side);
