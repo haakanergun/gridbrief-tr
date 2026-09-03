@@ -4,6 +4,8 @@
 
 It is a decision-support prototype. It does not place orders, connect to a trading account, or recommend an execution. A human sets the exposure, changes assumptions, reviews the evidence, and explicitly approves a draft brief.
 
+![GridBrief TR workspace showing a source-aware electricity-market risk brief](public/gridbrief-overview.png)
+
 ## Why WebMCP
 
 Energy-market analysis often alternates between a participant's browser, operator data pages, spreadsheets, and a chat. That loses the user's selected scope and makes it hard to see which source and timestamp support an answer.
