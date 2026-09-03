@@ -15,7 +15,7 @@
 - [x] Public repository URL is final and opens without authentication: https://github.com/haakanergun/gridbrief-tr
 - [x] `npm install`, `npm run lint`, and `npm run build` succeed.
 - [x] README setup, mode disclosures, WebMCP explanation, test instructions, and deploy instructions match the final code.
-- [x] The six verified EPİAŞ reports and the official technical-documentation link are present and correct.
+- [x] The six documentation-mapped EPİAŞ report adapters and the official technical-documentation link are present; no live end-to-end validation is claimed.
 - [x] Confirm the root `LICENSE` contains the intended MIT text.
 - [x] Confirm `.gitignore` excludes `.env`, build outputs, and browser-test artifacts.
 
