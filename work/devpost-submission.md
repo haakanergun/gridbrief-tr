@@ -26,12 +26,14 @@ A browser agent uses the workspace's WebMCP tools to:
 
 1. set the delivery date and time window with `set_analysis_scope`;
 2. gather the in-scope market snapshot with `get_market_snapshot`;
-3. run a transparent price-stress scenario for the stated position with `stress_test_position`; and
-4. draft a shift brief with `draft_shift_brief` that carries its evidence and mode labels.
+3. search the organization and power-plant catalogs with `find_market_entities`;
+4. compare production-plan and system-consumption evidence with `compare_plan_actual` at the levels in which EPİAŞ publishes it;
+5. run a transparent price-stress scenario for the stated position with `stress_test_position`; and
+6. draft a shift brief with `draft_shift_brief` that carries its evidence and mode labels.
 
 The participant then changes an assumption, sees the stress result and draft update, and explicitly approves the brief. GridBrief neither places a trade nor exposes any execution tool.
 
-Each snapshot is marked with a source, retrieval/as-of time, and mode. In **Live EPİAŞ** mode, the gateway has documentation-mapped adapters for six reports: day-ahead PTF, balancing-market SMF, intraday weighted-average price, real-time consumption, real-time generation, and system direction. These adapters follow the official [EPİAŞ Electricity Service technical documentation](https://seffaflik.epias.com.tr/electricity-service/technical/tr/index.html). Partial upstream failures return null metrics and warnings; they are never filled with demo values. In **Synthetic demo** mode, deterministic demo data is visibly labelled `synthetic` and `not EPİAŞ`; it is never presented as live market data. Synthetic mode is used only when live credentials are not configured.
+Each snapshot is marked with a source, retrieval/as-of time, and mode. In **Live EPİAŞ** mode, the gateway has documentation-mapped adapters for six reports: day-ahead PTF, balancing-market SMF, intraday weighted-average price, real-time consumption, real-time generation, and system direction. These adapters follow the official [EPİAŞ Electricity Service technical documentation](https://seffaflik.epias.com.tr/electricity-service/technical/tr/index.html). Partial upstream failures return null metrics and warnings; they are never filled with demo values. In **Synthetic demo** mode, deterministic demo data is visibly labelled `synthetic` and `not EPİAŞ`; it is never presented as live market data. Synthetic mode is used only when live mode is explicitly disabled.
 
 The public challenge deployment runs in synthetic demo mode so reviewers can reproduce the workflow without an EPİAŞ account. It does not retrieve, display, or redistribute EPİAŞ data. Its values are demonstration-only; the optional live gateway is intended only for a user operating under their own authorized EPİAŞ account and remains subject to EPİAŞ terms.
 
@@ -39,7 +41,9 @@ Because the walkthrough's delivery window was future-dated when built, its synth
 
 ## How we used WebMCP
 
-WebMCP is not a chat box bolted onto a dashboard. It lets the browser agent use the same stateful workspace as the participant through four tools: `set_analysis_scope`, `get_market_snapshot`, `stress_test_position`, and `draft_shift_brief`. The agent sets a structured delivery scope, retrieves the visible snapshot with provenance, calculates a bounded stress test, and prepares a draft brief. Results are rendered back into the workspace for review.
+WebMCP is not a chat box bolted onto a dashboard. It lets the browser agent use the same stateful workspace as the participant through six tools: `set_analysis_scope`, `get_market_snapshot`, `find_market_entities`, `compare_plan_actual`, `stress_test_position`, and `draft_shift_brief`. The agent can move from a structured delivery scope to a source-labelled entity or planning view, retrieve the visible snapshot with provenance, calculate a bounded stress test, and prepare a draft brief. Results are rendered back into the workspace for review.
+
+The data-level boundary is part of the tool contract: organization and UEVÇB filters apply to KGÜP, KUDÜP, and EAK production plans, while real-time generation, load plan, and consumption remain Türkiye-system observations in the planning comparison. Missing hours stay null, every aggregate reports its coverage, and a full-day deviation is withheld unless both compared series cover all 24 hours.
 
 The visible UI and market API use an inclusive final hour: 17:00–22:59 is `startHour: 17, endHour: 22`. WebMCP uses an exclusive `endHour`, so the equivalent agent tool call is `startHour: 17, endHour: 23`. This explicit convention avoids an off-by-one delivery-hour error.
 
@@ -49,17 +53,17 @@ Before this workflow, creating a defensible brief meant manually carrying the sa
 
 ## How we built it
 
-The application keeps a single workspace state for position, delivery window, selected assumptions, snapshot, stress result, and draft brief. Its WebMCP registration maps the four safe actions—scope, snapshot, stress, and draft—to that state. This lets a compatible browser agent invoke the workflow and lets ordinary UI controls modify the exact same information.
+The application coordinates the market scope, separate explorer date, selected entity, planning layer, snapshot, stress result, and draft brief. Its WebMCP registration maps six safe actions—scope, snapshot, entity search, plan comparison, stress, and draft—to those visible states. This lets a compatible browser agent invoke the workflow and lets ordinary UI controls modify the exact same information without allowing market execution.
 
-We verified the deployed workflow in Chrome 152's experimental WebMCP implementation: `getTools()` discovered all four registrations and sequential `executeTool()` calls completed the full flow without console errors.
+The original four-tool workflow was verified in Chrome 152's experimental WebMCP implementation. We re-verified the current build in a compatible browser WebMCP runtime: it discovered all six registrations, and calls to `find_market_entities` and `compare_plan_actual` returned structured results while visibly opening the organization and planning workspaces without console errors.
 
-The data boundary is explicit. Live EPİAŞ requests use server-side configuration and a short-lived TGT authentication flow; credentials are never exposed to the browser. The server retains a TGT in memory for up to two hours with a five-minute renewal buffer. When credentials are absent, the app uses a deterministic synthetic fixture and labels it in the UI and output. A live request with a partial source failure yields a warning and null value rather than synthetic substitution. Each snapshot includes provenance and freshness metadata so a delayed, unavailable, or synthetic source cannot masquerade as real-time information.
+The data boundary is explicit. Live EPİAŞ requests use server-side configuration and a short-lived TGT authentication flow; credentials are never exposed to the browser. The server retains a TGT in memory for up to two hours with a five-minute renewal buffer. When live mode is disabled, the app uses a deterministic synthetic fixture and labels it in the UI and output. Enabling live mode with missing credentials fails closed. A live request with a partial source failure yields a warning and null value rather than synthetic substitution. Each snapshot includes provenance and freshness metadata so a delayed, unavailable, or synthetic source cannot masquerade as real-time information.
 
 Stress results are simple disclosed sensitivities—exposure multiplied by a selected price move—not predictive models or trade recommendations. A final approval is a user action, not an agent call.
 
 ## Challenges we ran into
 
-The key challenge was making a useful agent workflow without compromising market-data integrity or human control. EPİAŞ data access requires authentication and reports have different publishing schedules, while a credential-free public demo must remain reproducible. We addressed this by separating live and synthetic modes, preserving source/freshness metadata, keeping secrets server-side, and limiting WebMCP to non-executing analysis tasks. Synthetic mode is selected only when credentials are not configured; it is not a live-data failure fallback.
+The key challenge was making a useful agent workflow without compromising market-data integrity or human control. EPİAŞ data access requires authentication and reports have different publishing schedules, while a credential-free public demo must remain reproducible. We addressed this by separating live and synthetic modes, preserving source/freshness metadata, keeping secrets server-side, and limiting WebMCP to non-executing analysis tasks. Synthetic mode is selected only when live mode is explicitly disabled; enabling live mode with missing credentials fails closed, and a live-data failure never falls back to synthetic values.
 
 The design challenge was resisting a broad “AI market terminal.” A single, complete shift-brief workflow made it possible to show why WebMCP matters: an agent completes repetitive context work while the participant can visibly inspect, change, and approve every material assumption.
 

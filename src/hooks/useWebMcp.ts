@@ -48,6 +48,8 @@ function getRegistrationError(error: unknown): string {
 export function useWebMcp({
   setAnalysisScope,
   getMarketSnapshot,
+  findMarketEntities,
+  comparePlanActual,
   stressTestPosition,
   draftShiftBrief,
   onActivity,
@@ -56,6 +58,8 @@ export function useWebMcp({
   const handlersRef = useRef<WebMcpHandlers>({
     setAnalysisScope,
     getMarketSnapshot,
+    findMarketEntities,
+    comparePlanActual,
     stressTestPosition,
     draftShiftBrief,
   });
@@ -67,6 +71,8 @@ export function useWebMcp({
     handlersRef.current = {
       setAnalysisScope,
       getMarketSnapshot,
+      findMarketEntities,
+      comparePlanActual,
       stressTestPosition,
       draftShiftBrief,
     };
@@ -75,6 +81,8 @@ export function useWebMcp({
     onActivity,
     setAnalysisScope,
     getMarketSnapshot,
+    findMarketEntities,
+    comparePlanActual,
     stressTestPosition,
     draftShiftBrief,
   ]);
@@ -115,6 +123,10 @@ export function useWebMcp({
         handlersRef.current.setAnalysisScope(input, context),
       getMarketSnapshot: (input, context) =>
         handlersRef.current.getMarketSnapshot(input, context),
+      findMarketEntities: (input, context) =>
+        handlersRef.current.findMarketEntities(input, context),
+      comparePlanActual: (input, context) =>
+        handlersRef.current.comparePlanActual(input, context),
       stressTestPosition: (input, context) =>
         handlersRef.current.stressTestPosition(input, context),
       draftShiftBrief: (input, context) =>

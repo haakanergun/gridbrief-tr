@@ -247,6 +247,7 @@ export async function fetchEpiasItems(
   path: string,
   requestBody: Record<string, unknown>,
   retryAuth = true,
+  timeoutMs = REQUEST_TIMEOUT_MS,
 ): Promise<Record<string, unknown>[]> {
   const ticket = await getTicket();
   const response = await fetchWithTimeout(`${API_ROOT}${path}`, {
@@ -257,11 +258,11 @@ export async function fetchEpiasItems(
       TGT: ticket,
     },
     body: JSON.stringify(requestBody),
-  });
+  }, timeoutMs);
 
   if ((response.status === 401 || response.status === 403) && retryAuth) {
     clearTicket();
-    return fetchEpiasItems(path, requestBody, false);
+    return fetchEpiasItems(path, requestBody, false, timeoutMs);
   }
 
   if (!response.ok) {
@@ -300,6 +301,67 @@ export async function fetchEpiasItems(
     throw new GatewayError(
       "UPSTREAM_INVALID_RESPONSE",
       "EPİAŞ response did not contain a data series.",
+      502,
+    );
+  }
+
+  return items.filter(
+    (item): item is Record<string, unknown> =>
+      typeof item === "object" && item !== null && !Array.isArray(item),
+  );
+}
+
+export async function fetchEpiasGetItems(
+  path: string,
+  retryAuth = true,
+  timeoutMs = REQUEST_TIMEOUT_MS,
+): Promise<Record<string, unknown>[]> {
+  const ticket = await getTicket();
+  const response = await fetchWithTimeout(`${API_ROOT}${path}`, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      TGT: ticket,
+    },
+  }, timeoutMs);
+
+  if ((response.status === 401 || response.status === 403) && retryAuth) {
+    clearTicket();
+    return fetchEpiasGetItems(path, false, timeoutMs);
+  }
+
+  if (!response.ok) {
+    throw new GatewayError(
+      response.status === 401 || response.status === 403
+        ? "UPSTREAM_AUTH_FAILED"
+        : "UPSTREAM_UNAVAILABLE",
+      response.status === 401 || response.status === 403
+        ? "EPİAŞ authorization failed."
+        : "An EPİAŞ reference data endpoint failed.",
+      502,
+    );
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new GatewayError("UPSTREAM_INVALID_RESPONSE", "EPİAŞ returned malformed JSON.", 502);
+  }
+
+  if (typeof payload !== "object" || payload === null) {
+    throw new GatewayError(
+      "UPSTREAM_INVALID_RESPONSE",
+      "EPİAŞ returned an invalid reference data response.",
+      502,
+    );
+  }
+
+  const items = (payload as { items?: unknown }).items;
+  if (!Array.isArray(items)) {
+    throw new GatewayError(
+      "UPSTREAM_INVALID_RESPONSE",
+      "EPİAŞ response did not contain a reference data list.",
       502,
     );
   }

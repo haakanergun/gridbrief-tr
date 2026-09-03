@@ -31,9 +31,9 @@ export function buildSignals(points: MarketPoint[]): MarketSignal[] {
     signals.push({
       id: "ptf-range",
       severity: severityByRatio(ratio),
-      title: "PTF range widens",
-      detail: `The gap between the lowest and highest PTF in the selected window is ${spread.toFixed(0)} TRY/MWh.`,
-      metric: `${Math.round(spread * 100) / 100} TRY/MWh`,
+      title: "PTF aralığı genişliyor",
+      detail: `Seçili penceredeki en düşük ve en yüksek PTF arasındaki fark ${spread.toFixed(0)} TL/MWh.`,
+      metric: `${Math.round(spread * 100) / 100} TL/MWh`,
       sourceTimestamp: peak.timestamp,
       coverage: coverageLabel(prices.length / points.length),
     });
@@ -45,9 +45,9 @@ export function buildSignals(points: MarketPoint[]): MarketSignal[] {
     signals.push({
       id: "system-deficit",
       severity: deficitPoints.length >= Math.ceil(points.length / 2) ? "high" : "medium",
-      title: "System shortage signal",
-      detail: `${deficitPoints.length} hours indicate an energy-short system. Balancing-market data can be about four hours delayed.`,
-      metric: `${deficitPoints.length} hours`,
+      title: "Sistem açığı sinyali",
+      detail: `${deficitPoints.length} saat sistemin enerji açığında olduğunu gösteriyor. Dengeleme piyasası verisi yaklaşık dört saat gecikmeli olabilir.`,
+      metric: `${deficitPoints.length} saat`,
       sourceTimestamp: deficitPoints[0].timestamp,
       coverage: coverageLabel(systemDirectionCoverage),
     });
@@ -63,8 +63,8 @@ export function buildSignals(points: MarketPoint[]): MarketSignal[] {
     signals.push({
       id: "supply-margin",
       severity: tightest.margin < 0 ? "high" : "medium",
-      title: "Tight generation margin",
-      detail: `The hourly generation–consumption margin is ${(tightest.margin * 100).toFixed(1)}% of load.`,
+      title: "Üretim marjı daralıyor",
+      detail: `Saatlik üretim–tüketim marjı yükün ${(tightest.margin * 100).toFixed(1)}% düzeyinde.`,
       metric: `${Math.round(tightest.margin * 10_000) / 100}%`,
       sourceTimestamp: tightest.point.timestamp,
       coverage: coverageLabel(supplyPoints.length / points.length),

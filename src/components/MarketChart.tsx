@@ -36,14 +36,14 @@ export function MarketChart({ points, startHour, endHour, loading = false }: Mar
   }
 
   if (!points.length) {
-    return <div className="chart-empty">Waiting for a market snapshot…</div>;
+    return <div className="chart-empty">Piyasa görünümü bekleniyor…</div>;
   }
 
   return (
     <div className={`chart-shell ${loading ? "is-loading" : ""}`}>
       <div className="chart-legend" aria-label="Chart legend">
         <span><i className="legend-line legend-ptf" />PTF</span>
-        <span><i className="legend-line legend-idm" />IDM WAP</span>
+        <span><i className="legend-line legend-idm" />GİP AOF</span>
         <span><i className="legend-line legend-smf" />SMF</span>
         <span className="chart-unit">TRY / MWh</span>
       </div>
@@ -51,7 +51,7 @@ export function MarketChart({ points, startHour, endHour, loading = false }: Mar
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="market-chart"
         role="img"
-        aria-label="Hourly PTF, intraday weighted average, and SMF prices"
+        aria-label="Saatlik PTF, gün içi ağırlıklı ortalama ve SMF fiyatları"
         onPointerMove={onPointerMove}
         onPointerLeave={() => setActiveIndex(null)}
       >
@@ -68,7 +68,7 @@ export function MarketChart({ points, startHour, endHour, loading = false }: Mar
           height={HEIGHT - TOP - BOTTOM}
           className="risk-window"
         />
-        <text x={riskStart + 9} y={TOP + 17} className="risk-label">DELIVERY WINDOW</text>
+        <text x={riskStart + 9} y={TOP + 17} className="risk-label">TESLİMAT PENCERESİ</text>
         {chart.ticks.map((tick) => (
           <g key={tick.value}>
             <line x1={LEFT} x2={WIDTH - RIGHT} y1={tick.y} y2={tick.y} className="grid-line" />
@@ -104,7 +104,7 @@ export function MarketChart({ points, startHour, endHour, loading = false }: Mar
         <div className="chart-tooltip" style={{ left: `${(chart.xForIndex(activeIndex) / WIDTH) * 100}%` }}>
           <b>{active.hour}</b>
           <span>PTF {formatChartValue(active.ptf)}</span>
-          <span>IDM {formatChartValue(active.idm)}</span>
+          <span>GİP {formatChartValue(active.idm)}</span>
           <span>SMF {formatChartValue(active.smf)}</span>
         </div>
       )}

@@ -1,6 +1,8 @@
 export const WEB_MCP_TOOL_NAMES = [
   "set_analysis_scope",
   "get_market_snapshot",
+  "find_market_entities",
+  "compare_plan_actual",
   "stress_test_position",
   "draft_shift_brief",
 ] as const;
@@ -35,6 +37,20 @@ export interface MarketSnapshotInput {
   endHour?: number;
 }
 
+export interface FindMarketEntitiesInput {
+  query: string;
+  entityType?: "organization" | "plant" | "all";
+  marketDate?: string;
+  limit?: number;
+}
+
+export interface ComparePlanActualInput {
+  marketDate?: string;
+  organizationId?: number;
+  uevcbId?: number;
+  layer?: "production" | "consumption" | "both";
+}
+
 export interface StressTestPositionInput {
   direction: "long" | "short";
   volumeMwh: number;
@@ -62,6 +78,14 @@ export interface WebMcpHandlers {
   ) => JsonValue | Promise<JsonValue>;
   getMarketSnapshot: (
     input: MarketSnapshotInput,
+    context: WebMcpExecutionContext,
+  ) => JsonValue | Promise<JsonValue>;
+  findMarketEntities: (
+    input: FindMarketEntitiesInput,
+    context: WebMcpExecutionContext,
+  ) => JsonValue | Promise<JsonValue>;
+  comparePlanActual: (
+    input: ComparePlanActualInput,
     context: WebMcpExecutionContext,
   ) => JsonValue | Promise<JsonValue>;
   stressTestPosition: (
@@ -218,6 +242,80 @@ const toolBlueprints = (handlers: WebMcpHandlers): ToolBlueprint[] => [
     },
     handler: (input, context) =>
       handlers.getMarketSnapshot(input as MarketSnapshotInput, context),
+  },
+  {
+    name: "find_market_entities",
+    title: "Find market organizations and plants",
+    description:
+      "Search organization and power-plant catalogs and open the matching entity workspace. Live mode returns public EPİAŞ Transparency records through the authenticated gateway; static demo mode returns explicitly fictional entities. Neither mode proves that an entity belongs to the user's private portfolio.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        query: {
+          type: "string",
+          minLength: 2,
+          maxLength: 120,
+          description: "Organization or power-plant name, short name, or EIC fragment to search.",
+        },
+        entityType: {
+          type: "string",
+          enum: ["organization", "plant", "all"],
+          default: "all",
+          description: "Limit the search to organizations, plants, or both catalogs.",
+        },
+        marketDate: marketDateSchema,
+        limit: {
+          type: "integer",
+          minimum: 1,
+          maximum: 25,
+          default: 10,
+          description: "Maximum number of matches returned across the requested catalogs.",
+        },
+      },
+      required: ["query"],
+    },
+    annotations: {
+      readOnlyHint: false,
+      untrustedContentHint: true,
+    },
+    handler: (input, context) =>
+      handlers.findMarketEntities(input as unknown as FindMarketEntitiesInput, context),
+  },
+  {
+    name: "compare_plan_actual",
+    title: "Compare electricity plan and actual",
+    description:
+      "Read and display source-attributed production planning or system-consumption series for one market day. Live mode uses EPİAŞ; static demo mode uses explicitly synthetic values. Optional organization and UEVÇB filters apply only to KGÜP, KUDÜP, and EAK; consumption remains system-level.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        marketDate: marketDateSchema,
+        organizationId: {
+          type: "integer",
+          minimum: 1,
+          description: "Optional EPİAŞ organization ID for production-plan scope.",
+        },
+        uevcbId: {
+          type: "integer",
+          minimum: 1,
+          description: "Optional EPİAŞ UEVÇB ID for production-plan scope. organizationId is required when this is supplied.",
+        },
+        layer: {
+          type: "string",
+          enum: ["production", "consumption", "both"],
+          default: "both",
+          description: "Series group to return. Consumption is always the Turkey system scope.",
+        },
+      },
+    },
+    annotations: {
+      readOnlyHint: false,
+      untrustedContentHint: true,
+    },
+    handler: (input, context) =>
+      handlers.comparePlanActual(input as ComparePlanActualInput, context),
   },
   {
     name: "stress_test_position",

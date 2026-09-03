@@ -51,10 +51,10 @@ export function syntheticSnapshot(
   return {
     mode: "synthetic",
     source: {
-      provider: "Synthetic demo generator (not EPİAŞ)",
+      provider: "Sentetik GridBrief gösterimi (EPİAŞ verisi değildir)",
       fetchedAt: options.fetchedAt ?? new Date().toISOString(),
       timezone: "Europe/Istanbul",
-      note: "SYNTHETIC REPLAY: Fabricated next-day reference observations demonstrate the workflow. They are not EPİAŞ data or future actuals and must not be used for market decisions.",
+      note: "AÇIKÇA SENTETİK GÖSTERİM: Kurgusal referans gözlemleri iş akışını gösterir. EPİAŞ verisi veya gelecek gerçekleşeni değildir ve piyasa kararında kullanılmamalıdır.",
     },
     scope: {
       date: request.date,
@@ -66,6 +66,6 @@ export function syntheticSnapshot(
       const hour = Number(point.hour.slice(0, 2));
       return hour >= request.startHour && hour <= request.endHour;
     })),
-    warnings: ["Synthetic demo data is shown because server-side EPİAŞ credentials are not configured."],
+    warnings: ["Sunucu tarafında canlı EPİAŞ erişimi etkin olmadığı için sentetik gösterim verisi kullanılıyor."],
   };
 }

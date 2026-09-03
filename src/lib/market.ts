@@ -108,24 +108,24 @@ export function calculateStress(
     contextPeakHour: adversePoint?.hour ?? "—",
     calculation:
       spread === null
-        ? "Unavailable: both PTF and IDM observations are required."
-        : `${positionMwh} MWh × ${round(Math.max(0, spread))} TRY/MWh adverse spread`,
-    disclaimer: "Illustrative sensitivity, not a forecast, order recommendation, or settlement calculation.",
+        ? "Kullanılamıyor: hem PTF hem GİP gözlemi gerekli."
+        : `${positionMwh} MWh × ${round(Math.max(0, spread))} TL/MWh olumsuz makas`,
+    disclaimer: "Gösterge niteliğinde duyarlılık hesabıdır; tahmin, emir önerisi veya uzlaştırma hesabı değildir.",
   };
 }
 
 export function draftBrief(snapshot: MarketSnapshot, stress: StressResult): string[] {
-  const direction = stress.side === "short" ? "short" : "long";
+  const direction = stress.side === "short" ? "kısa" : "uzun";
   const topSignals = snapshot.signals.slice(0, 3).map((signal) => signal.title.toLowerCase());
   return [
-    `Monitor the ${snapshot.scope.startHour}:00–${snapshot.scope.endHour}:00 delivery window; the current scenario is ${stress.positionMwh} MWh ${direction}.`,
+    `${snapshot.scope.startHour}:00–${snapshot.scope.endHour}:00 teslimat penceresini izleyin; mevcut senaryo ${stress.positionMwh} MWh ${direction} pozisyondur.`,
     stress.estimatedExposureTry === null
-      ? "Illustrative exposure is unavailable because the selected window is missing PTF or IDM observations."
-      : `Illustrative adverse exposure is ${formatTry(stress.estimatedExposureTry)}; the selected-window IDM context peak is at ${stress.contextPeakHour}.`,
+      ? "Seçili pencerede PTF veya GİP gözlemi eksik olduğu için gösterge niteliğindeki etki hesaplanamıyor."
+      : `Gösterge niteliğindeki olumsuz etki ${formatTry(stress.estimatedExposureTry)}; seçili pencerenin GİP bağlam zirvesi ${stress.contextPeakHour}.`,
     topSignals.length
-      ? `Primary evidence to re-check: ${topSignals.join("; ")}.`
-      : "No ranked evidence is available yet; refresh the market snapshot before deciding.",
-    "Human review required: confirm position, data publication times, and portfolio-specific constraints before acting.",
+      ? `Yeniden kontrol edilecek başlıca kanıtlar: ${topSignals.join("; ")}.`
+      : "Henüz sıralanmış kanıt yok; karar öncesinde piyasa görünümünü yenileyin.",
+    "İnsan kontrolü zorunludur: aksiyon almadan önce pozisyonu, veri yayın saatlerini ve portföye özgü kısıtları doğrulayın.",
   ];
 }
 

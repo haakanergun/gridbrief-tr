@@ -1,12 +1,10 @@
 # GridBrief TR
 
-[Live challenge demo](https://haakanergun.github.io/gridbrief-tr/) · [OpenAI WebMCP Challenge](https://webmcp.devpost.com/)
+[Public synthetic challenge demo](https://haakanergun.github.io/gridbrief-tr/) · [Protected live EPİAŞ workspace](https://gridbrief-tr.vercel.app/) · [OpenAI WebMCP Challenge](https://webmcp.devpost.com/)
 
 **GridBrief TR** is an agent-native risk workspace for participants in Türkiye's electricity market. It turns a market operator's question—such as “I am short 50 MWh for the next delivery day from 17:00 to 22:00; what should I watch?”—into a human-reviewable, source- and freshness-aware shift brief.
 
 It is a decision-support prototype. It does not place orders, connect to a trading account, or recommend an execution. A human sets the exposure, changes assumptions, reviews the evidence, and explicitly approves a draft brief.
-
-![GridBrief TR workspace showing a source-aware electricity-market risk brief](public/gridbrief-overview.png)
 
 ## Why WebMCP
 
@@ -18,8 +16,10 @@ GridBrief exposes the current workspace as WebMCP tools so a browser agent can o
 
 1. `set_analysis_scope` sets the delivery date and time range;
 2. `get_market_snapshot` reads the current market snapshot and its provenance;
-3. `stress_test_position` tests a stated exposure against a disclosed what-if scenario; and
-4. `draft_shift_brief` prepares an editable brief that preserves source, collection time, and mode labels.
+3. `find_market_entities` searches the organization and plant catalogs and opens the matching workspace;
+4. `compare_plan_actual` loads KGÜP, KUDÜP, EAK, generation, load-plan, and consumption evidence at their published data levels;
+5. `stress_test_position` tests a stated exposure against a disclosed what-if scenario; and
+6. `draft_shift_brief` prepares an editable brief that preserves source, collection time, and mode labels.
 
 The agent does the repetitive retrieval and synthesis; the human remains responsible for inputs, changed assumptions, and approval. This is deliberately read-only: no market action is exposed as a tool.
 
@@ -48,7 +48,7 @@ The public challenge deployment neither retrieves nor redistributes EPİAŞ data
 
 Because the walkthrough's delivery window is in the future relative to its build date, the synthetic observations demonstrate the collaboration flow; they are not claimed as future actuals. A production next-day view would use day-ahead PTF plus appropriately licensed forecast and outage inputs, while delayed consumption, generation, SMF, and system-direction observations would appear only as current context. That temporal split is future work, not a capability claimed by this prototype.
 
-The live gateway has documentation-mapped adapters for six EPİAŞ Transparency Platform reports: day-ahead market PTF, balancing-market SMF, intraday-market weighted-average price, real-time consumption, real-time generation, and system direction. See the official [EPİAŞ Electricity Service technical documentation](https://seffaflik.epias.com.tr/electricity-service/technical/tr/index.html). Complete a production and legal review before enabling live use.
+The core market snapshot has documentation-mapped adapters for six EPİAŞ Transparency Platform reports: day-ahead market PTF, balancing-market SMF, intraday-market weighted-average price, real-time consumption, real-time generation, and system direction. The explorer additionally maps the official organization, plant, UEVÇB, participant, clearing-quantity, KGÜP, KUDÜP, EAK, injection-quantity, and load-plan services. Organization and UEVÇB filters apply only to production plans; load-plan and consumption observations remain Türkiye-system data. See the official [EPİAŞ Electricity Service technical documentation](https://seffaflik.epias.com.tr/electricity-service/technical/tr/index.html). Complete a production and legal review before enabling live use.
 
 ## Run locally
 
@@ -96,10 +96,10 @@ Fast judge walkthrough:
 
 1. Open the [live challenge demo](https://haakanergun.github.io/gridbrief-tr/) in ChatGPT's WebMCP-capable in-app browser, or in Chrome 149+ after enabling `chrome://flags/#enable-webmcp-testing` and restarting.
 2. Confirm the header says `WebMCP ready`, then click **Copy agent prompt** and give that instruction to the browser agent.
-3. Watch `DEMO TRACE` change to `WEBMCP TRACE` as the four tools update the visible scope, snapshot, stress result, and English draft.
+3. Ask the agent to search a demo organization and compare its plan evidence, then run the position workflow. Watch `DEMO TRACE` change to `WEBMCP TRACE` as the six tools update the visible entity, planning, scope, snapshot, stress, and draft views.
 4. Click **Review & approve** yourself; approval is intentionally not exposed as an agent tool.
 
-The public build has also been exercised against Chrome 152's experimental WebMCP implementation: `getTools()` discovered all four tools and sequential `executeTool()` calls completed the scope, snapshot, stress, and draft flow without console errors.
+The original four-tool flow was exercised against Chrome 152's experimental WebMCP implementation. The current six-tool build was then re-verified in a compatible browser WebMCP runtime: all six registrations were discovered, and `find_market_entities` plus `compare_plan_actual` returned structured results and visibly opened their corresponding workspaces without console errors.
 
 The market gateway can also be checked without a browser agent:
 

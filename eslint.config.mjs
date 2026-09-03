@@ -13,5 +13,6 @@ export default defineConfig([
     "outputs/**",
     "work/gridbrief-video/**",
     "work/video-captures/**",
+    "work/static-check/**",
   ]),
 ]);
