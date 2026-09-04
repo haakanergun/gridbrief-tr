@@ -5,6 +5,8 @@ export const WEB_MCP_TOOL_NAMES = [
   "compare_plan_actual",
   "stress_test_position",
   "draft_shift_brief",
+  "search_transparency_datasets",
+  "get_transparency_dataset",
 ] as const;
 
 export type WebMcpToolName = (typeof WEB_MCP_TOOL_NAMES)[number];
@@ -66,6 +68,40 @@ export interface DraftShiftBriefInput {
   notes?: string;
 }
 
+export type TransparencyDatasetSection =
+  | "markets"
+  | "generation"
+  | "consumption"
+  | "renewables"
+  | "transmission"
+  | "dams"
+  | "messages"
+  | "reports"
+  | "bulletins"
+  | "all";
+
+export interface SearchTransparencyDatasetsInput {
+  query?: string;
+  section?: TransparencyDatasetSection;
+  limit?: number;
+}
+
+export type TransparencyDatasetFilterValue = string | number | string[] | number[];
+
+export interface GetTransparencyDatasetInput {
+  datasetId?: string;
+  menuId?: number;
+  startDate?: string;
+  endDate?: string;
+  date?: string;
+  period?: string;
+  filters?: Record<string, TransparencyDatasetFilterValue>;
+  page?: {
+    number?: number;
+    size?: number;
+  };
+}
+
 export interface WebMcpExecutionContext {
   signal: AbortSignal;
   toolName: WebMcpToolName;
@@ -94,6 +130,14 @@ export interface WebMcpHandlers {
   ) => JsonValue | Promise<JsonValue>;
   draftShiftBrief: (
     input: DraftShiftBriefInput,
+    context: WebMcpExecutionContext,
+  ) => JsonValue | Promise<JsonValue>;
+  searchTransparencyDatasets: (
+    input: SearchTransparencyDatasetsInput,
+    context: WebMcpExecutionContext,
+  ) => JsonValue | Promise<JsonValue>;
+  getTransparencyDataset: (
+    input: GetTransparencyDatasetInput,
     context: WebMcpExecutionContext,
   ) => JsonValue | Promise<JsonValue>;
 }
@@ -161,6 +205,70 @@ const hourSchema = {
   minimum: 0,
   maximum: 24,
   description: "Turkey market hour boundary, from 0 through 24.",
+} as const;
+
+const datasetFilterStringSchema = {
+  type: "string",
+  minLength: 1,
+  maxLength: 180,
+  pattern: ".*\\S.*",
+} as const;
+
+const datasetFilterIntegerSchema = {
+  type: "integer",
+  minimum: 0,
+  maximum: Number.MAX_SAFE_INTEGER,
+} as const;
+
+const datasetFilterStringOrIntegerSchema = {
+  oneOf: [datasetFilterStringSchema, datasetFilterIntegerSchema],
+} as const;
+
+const datasetFilterIntegerArraySchema = {
+  type: "array",
+  minItems: 1,
+  maxItems: 100,
+  items: datasetFilterIntegerSchema,
+} as const;
+
+const datasetFiltersSchema = {
+  type: "object",
+  maxProperties: 16,
+  additionalProperties: false,
+  properties: {
+    basinName: datasetFilterStringSchema,
+    contractId: datasetFilterIntegerSchema,
+    damName: datasetFilterStringSchema,
+    deliveryPeriod: datasetFilterStringSchema,
+    direction: datasetFilterStringSchema,
+    distributionCompanyId: datasetFilterIntegerSchema,
+    distributionId: datasetFilterIntegerSchema,
+    districtName: datasetFilterStringSchema,
+    distrubutionOrganization: datasetFilterIntegerSchema,
+    groupId: datasetFilterIntegerSchema,
+    loadType: datasetFilterStringSchema,
+    mesajTipId: datasetFilterIntegerSchema,
+    meterReadOrgId: datasetFilterIntegerSchema,
+    meterReadingType: datasetFilterIntegerSchema,
+    orderType: datasetFilterStringSchema,
+    organizationId: datasetFilterIntegerSchema,
+    organizationIds: datasetFilterIntegerArraySchema,
+    powerplantId: datasetFilterIntegerSchema,
+    powerPlantId: datasetFilterIntegerSchema,
+    powerPlantIds: datasetFilterIntegerArraySchema,
+    priceType: datasetFilterStringSchema,
+    profileGroupId: datasetFilterIntegerSchema,
+    profileGroupName: datasetFilterStringSchema,
+    provinceId: datasetFilterIntegerSchema,
+    region: datasetFilterStringSchema,
+    regionId: datasetFilterIntegerSchema,
+    subscriberProfileGroup: datasetFilterStringOrIntegerSchema,
+    subscriberProfileGroupName: datasetFilterStringSchema,
+    uevcbId: datasetFilterIntegerSchema,
+    uevcbIds: datasetFilterIntegerArraySchema,
+    uevcbName: datasetFilterStringSchema,
+    year: datasetFilterStringOrIntegerSchema,
+  },
 } as const;
 
 const toolBlueprints = (handlers: WebMcpHandlers): ToolBlueprint[] => [
@@ -237,7 +345,7 @@ const toolBlueprints = (handlers: WebMcpHandlers): ToolBlueprint[] => [
       },
     },
     annotations: {
-      readOnlyHint: false,
+      readOnlyHint: true,
       untrustedContentHint: true,
     },
     handler: (input, context) =>
@@ -276,7 +384,7 @@ const toolBlueprints = (handlers: WebMcpHandlers): ToolBlueprint[] => [
       required: ["query"],
     },
     annotations: {
-      readOnlyHint: false,
+      readOnlyHint: true,
       untrustedContentHint: true,
     },
     handler: (input, context) =>
@@ -311,7 +419,7 @@ const toolBlueprints = (handlers: WebMcpHandlers): ToolBlueprint[] => [
       },
     },
     annotations: {
-      readOnlyHint: false,
+      readOnlyHint: true,
       untrustedContentHint: true,
     },
     handler: (input, context) =>
@@ -415,6 +523,144 @@ const toolBlueprints = (handlers: WebMcpHandlers): ToolBlueprint[] => [
     },
     handler: (input, context) =>
       handlers.draftShiftBrief(input as DraftShiftBriefInput, context),
+  },
+  {
+    name: "search_transparency_datasets",
+    title: "Search Transparency datasets",
+    description:
+      "Find EPİAŞ Transparency electricity data sources by dataset name or section. This read-only catalog discovery may synchronize the visible catalog filters; it does not modify EPİAŞ data.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        query: {
+          type: "string",
+          minLength: 1,
+          maxLength: 120,
+          pattern: ".*\\S.*",
+          description:
+            "Optional dataset or source-name text to find in the Transparency catalog.",
+        },
+        section: {
+          type: "string",
+          enum: [
+            "markets",
+            "generation",
+            "consumption",
+            "renewables",
+            "transmission",
+            "dams",
+            "messages",
+            "reports",
+            "bulletins",
+            "all",
+          ],
+          default: "all",
+          description:
+            "Transparency catalog section to search. Use a section other than all when query is omitted.",
+        },
+        limit: {
+          type: "integer",
+          minimum: 1,
+          maximum: 25,
+          default: 10,
+          description: "Maximum number of matching data sources to return.",
+        },
+      },
+      anyOf: [
+        { required: ["query"] },
+        {
+          required: ["section"],
+          properties: {
+            section: {
+              enum: [
+                "markets",
+                "generation",
+                "consumption",
+                "renewables",
+                "transmission",
+                "dams",
+                "messages",
+                "reports",
+                "bulletins",
+              ],
+            },
+          },
+        },
+      ],
+    },
+    annotations: {
+      readOnlyHint: true,
+      untrustedContentHint: true,
+    },
+    handler: (input, context) => {
+      const typedInput = input as unknown as SearchTransparencyDatasetsInput;
+      const hasQuery =
+        typeof typedInput.query === "string" && typedInput.query.trim().length > 0;
+      const section = typedInput.section ?? "all";
+
+      if (!hasQuery && section === "all") {
+        throw new TypeError(
+          "Provide a non-empty query or select a section other than all.",
+        );
+      }
+
+      return handlers.searchTransparencyDatasets(typedInput, context);
+    },
+  },
+  {
+    name: "get_transparency_dataset",
+    title: "Get Transparency dataset",
+    description:
+      "Read one allowlisted EPİAŞ Transparency electricity dataset by the stable datasetId or menuId returned by search_transparency_datasets. The result is source-attributed and opened in the visible catalog. This tool never accepts an endpoint URL, submits a market action, or changes EPİAŞ data.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        datasetId: {
+          type: "string",
+          minLength: 1,
+          maxLength: 160,
+          pattern: "^[a-z0-9][a-z0-9.-]*$",
+          description: "Stable allowlisted dataset identifier returned by catalog search.",
+        },
+        menuId: {
+          type: "integer",
+          minimum: 0,
+          description: "Official EPİAŞ menu identifier returned by catalog search.",
+        },
+        startDate: marketDateSchema,
+        endDate: marketDateSchema,
+        date: marketDateSchema,
+        period: marketDateSchema,
+        filters: datasetFiltersSchema,
+        page: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            number: { type: "integer", minimum: 1, maximum: 10000, default: 1 },
+            size: { type: "integer", minimum: 1, maximum: 100, default: 100 },
+          },
+        },
+      },
+      oneOf: [
+        { required: ["datasetId"], not: { required: ["menuId"] } },
+        { required: ["menuId"], not: { required: ["datasetId"] } },
+      ],
+    },
+    annotations: {
+      readOnlyHint: true,
+      untrustedContentHint: true,
+    },
+    handler: (input, context) => {
+      const typedInput = input as unknown as GetTransparencyDatasetInput;
+      const hasDatasetId = typeof typedInput.datasetId === "string" && typedInput.datasetId.trim().length > 0;
+      const hasMenuId = Number.isSafeInteger(typedInput.menuId);
+      if (hasDatasetId === hasMenuId) {
+        throw new TypeError("Provide exactly one datasetId or menuId.");
+      }
+      return handlers.getTransparencyDataset(typedInput, context);
+    },
   },
 ];
 

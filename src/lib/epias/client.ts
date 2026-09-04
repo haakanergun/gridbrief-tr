@@ -4,6 +4,7 @@ import { GatewayError } from "./errors";
 
 const DEFAULT_AUTH_URL = "https://giris.epias.com.tr/cas/v1/tickets";
 const API_ROOT = "https://seffaflik.epias.com.tr/electricity-service";
+const REPORTING_API_ROOT = "https://seffaflik.epias.com.tr/reporting-service";
 const TGT_LIFETIME_MS = 2 * 60 * 60 * 1_000;
 const TGT_SAFETY_WINDOW_MS = 5 * 60 * 1_000;
 const REQUEST_TIMEOUT_MS = 8_000;
@@ -366,6 +367,75 @@ export async function fetchEpiasGetItems(
     );
   }
 
+  return items.filter(
+    (item): item is Record<string, unknown> =>
+      typeof item === "object" && item !== null && !Array.isArray(item),
+  );
+}
+
+export type EpiasServiceName = "electricity-service" | "reporting-service";
+
+/**
+ * Authenticated JSON-list fetcher for server-owned, allowlisted dataset
+ * definitions. Service selection is a closed union and request routes never
+ * pass client-supplied paths to this helper.
+ */
+export async function fetchEpiasServiceItems(
+  service: EpiasServiceName,
+  method: "GET" | "POST",
+  path: string,
+  requestBody: Record<string, unknown> = {},
+  retryAuth = true,
+  timeoutMs = REQUEST_TIMEOUT_MS,
+): Promise<Record<string, unknown>[]> {
+  if (!/^\/v1\/[A-Za-z0-9/_-]+$/.test(path)) {
+    throw new GatewayError("INVALID_REQUEST", "Invalid server-owned EPİAŞ dataset path.", 500);
+  }
+  const root = service === "electricity-service" ? API_ROOT : REPORTING_API_ROOT;
+  const ticket = await getTicket();
+  const response = await fetchWithTimeout(`${root}${path}`, {
+    method,
+    headers: {
+      Accept: "application/json",
+      ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
+      TGT: ticket,
+    },
+    ...(method === "POST" ? { body: JSON.stringify(requestBody) } : {}),
+  }, timeoutMs);
+
+  if ((response.status === 401 || response.status === 403) && retryAuth) {
+    clearTicket();
+    return fetchEpiasServiceItems(service, method, path, requestBody, false, timeoutMs);
+  }
+  if (!response.ok) {
+    throw new GatewayError(
+      response.status === 401 || response.status === 403
+        ? "UPSTREAM_AUTH_FAILED"
+        : "UPSTREAM_UNAVAILABLE",
+      response.status === 401 || response.status === 403
+        ? "EPİAŞ authorization failed."
+        : "An EPİAŞ dataset endpoint failed.",
+      502,
+    );
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new GatewayError("UPSTREAM_INVALID_RESPONSE", "EPİAŞ returned malformed JSON.", 502);
+  }
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+    throw new GatewayError("UPSTREAM_INVALID_RESPONSE", "EPİAŞ returned an invalid dataset response.", 502);
+  }
+  const items = (payload as { items?: unknown }).items;
+  if (!Array.isArray(items)) {
+    throw new GatewayError(
+      "UPSTREAM_INVALID_RESPONSE",
+      "EPİAŞ response did not contain a dataset series.",
+      502,
+    );
+  }
   return items.filter(
     (item): item is Record<string, unknown> =>
       typeof item === "object" && item !== null && !Array.isArray(item),

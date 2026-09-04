@@ -61,7 +61,7 @@ interface WebMcpModelContext extends EventTarget {
   getTools(options?: WebMcpGetToolOptions): Promise<WebMcpRegisteredTool[]>;
   executeTool(
     tool: WebMcpRegisteredTool,
-    input?: Record<string, unknown>,
+    input?: string,
     options?: WebMcpExecuteToolOptions,
   ): Promise<string>;
   ontoolchange: ((event: Event) => void) | null;

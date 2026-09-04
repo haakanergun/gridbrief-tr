@@ -42,12 +42,22 @@ export function isRequestAuthorized(request: Pick<Request, "headers">): boolean 
 
 export function isSameOriginPost(request: Pick<Request, "headers" | "method" | "url">): boolean {
   if (request.method.toUpperCase() !== "POST") return true;
+  if (process.env.NODE_ENV !== "production") return true;
+  try {
+    const hostname = new URL(request.url).hostname;
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]") return true;
+  } catch {
+    return false;
+  }
 
   const fetchSite = request.headers.get("sec-fetch-site");
   if (fetchSite && fetchSite !== "same-origin") return false;
 
   const origin = request.headers.get("origin");
-  if (!origin || origin === "null") return false;
+  // Browser-embedded local previews can omit Origin on a same-origin fetch.
+  // Sec-Fetch-Site is a forbidden request header, so an explicit same-origin
+  // value remains a trustworthy browser signal when Origin is absent.
+  if (!origin || origin === "null") return fetchSite === "same-origin";
 
   try {
     return new URL(origin).origin === new URL(request.url).origin;

@@ -26,6 +26,7 @@ import {
   type PlantExplorerResponse,
 } from "@/lib/explorer";
 import { PlanningChart, type ExplorerMetricKey, type PlanningSeries } from "@/components/PlanningChart";
+import type { Locale } from "@/i18n/locale";
 
 export type TransparencyView = "organizations" | "plants" | "planning";
 
@@ -36,6 +37,7 @@ interface TransparencyWorkspaceProps {
   initialResult?: ExplorerResponse | null;
   initialQuery?: string;
   initialPlanningLayer?: "production" | "consumption";
+  locale?: Locale;
 }
 
 const ORGANIZATION_SERIES: PlanningSeries[] = [
@@ -54,6 +56,16 @@ const CONSUMPTION_SERIES: PlanningSeries[] = [
   { key: "loadPlan", label: "Yük tahmin planı", tone: "secondary", dashed: true },
 ];
 
+const PLANT_SERIES_EN: PlanningSeries[] = [
+  { key: "realtimeGeneration", label: "Actual generation", tone: "primary" },
+  { key: "injectionQuantity", label: "UEVM", tone: "secondary", dashed: true },
+];
+
+const CONSUMPTION_SERIES_EN: PlanningSeries[] = [
+  { key: "realtimeConsumption", label: "Actual consumption", tone: "primary" },
+  { key: "loadPlan", label: "Load forecast plan", tone: "secondary", dashed: true },
+];
+
 const INITIAL_ENTITY_ROWS = 120;
 
 export function TransparencyWorkspace({
@@ -63,7 +75,9 @@ export function TransparencyWorkspace({
   initialResult = null,
   initialQuery = "",
   initialPlanningLayer = "production",
+  locale = "tr",
 }: TransparencyWorkspaceProps) {
+  const en = locale === "en";
   const seededCatalog = initialResult?.view === "catalog" && initialResult.scope.date === date
     ? initialResult
     : null;
@@ -268,8 +282,8 @@ export function TransparencyWorkspace({
   if (view === "organizations") {
     return (
       <EntityExplorerLayout
-        title="Organizasyon kapsamı"
-        description="Piyasa katılımı, GÖP eşleşmesi ve UEVÇB bazlı üretim planlarını aynı kanıt zincirinde inceleyin."
+        title={en ? "Organization scope" : "Organizasyon kapsamı"}
+        description={en ? "Review market participation, DAM matches, and UEVÇB-level generation plans in one evidence chain." : "Piyasa katılımı, GÖP eşleşmesi ve UEVÇB bazlı üretim planlarını aynı kanıt zincirinde inceleyin."}
         icon={<Building2 size={19} />}
         total={catalog?.organizations.length ?? 0}
         visible={filteredOrganizations.length}
@@ -278,6 +292,7 @@ export function TransparencyWorkspace({
         loading={catalogLoading}
         error={error}
         source={selectedOrganizationDetail?.source ?? catalog?.source}
+        locale={locale}
         list={
           filteredOrganizations.map((organization) => (
             <button
@@ -294,9 +309,9 @@ export function TransparencyWorkspace({
         }
       >
         {selectedOrganizationDetail ? (
-          <OrganizationDetail response={selectedOrganizationDetail} loading={detailLoading} />
+          <OrganizationDetail response={selectedOrganizationDetail} loading={detailLoading} locale={locale} />
         ) : (
-          <ExplorerEmpty icon={<Network size={25} />} loading={detailLoading} title="Bir organizasyon seçin" detail="Kayıt listesinden seçim yaptığınızda piyasa katılımı, bağlı UEVÇB’ler ve plan serileri burada açılır." />
+          <ExplorerEmpty icon={<Network size={25} />} loading={detailLoading} title={en ? "Select an organization" : "Bir organizasyon seçin"} detail={en ? "Select a record to open its market participation, linked UEVÇB units, and planning series." : "Kayıt listesinden seçim yaptığınızda piyasa katılımı, bağlı UEVÇB’ler ve plan serileri burada açılır."} locale={locale} />
         )}
       </EntityExplorerLayout>
     );
@@ -305,8 +320,8 @@ export function TransparencyWorkspace({
   if (view === "plants") {
     return (
       <EntityExplorerLayout
-        title="Santral kapsamı"
-        description="Santral bazlı gerçekleşen üretim ile uzlaştırmaya esas veriş miktarını saatlik düzeyde karşılaştırın."
+        title={en ? "Power plant scope" : "Santral kapsamı"}
+        description={en ? "Compare plant-level actual generation with settlement injection quantities by hour." : "Santral bazlı gerçekleşen üretim ile uzlaştırmaya esas veriş miktarını saatlik düzeyde karşılaştırın."}
         icon={<Factory size={19} />}
         total={catalog?.plants.length ?? 0}
         visible={filteredPlants.length}
@@ -315,6 +330,7 @@ export function TransparencyWorkspace({
         loading={catalogLoading}
         error={error}
         source={selectedPlantDetail?.source ?? catalog?.source}
+        locale={locale}
         list={
           filteredPlants.map((plant) => (
             <button
@@ -331,16 +347,16 @@ export function TransparencyWorkspace({
         }
       >
         {selectedPlantDetail ? (
-          <PlantDetail response={selectedPlantDetail} loading={detailLoading} />
+          <PlantDetail response={selectedPlantDetail} loading={detailLoading} locale={locale} />
         ) : (
-          <ExplorerEmpty icon={<Factory size={25} />} loading={detailLoading} title="Bir santral seçin" detail="Santral seçimi gerçekleşen üretim ve UEVM kayıtlarını açar. Plan verileri, resmî yayın seviyesine uygun olarak Planlama görünümünde UEVÇB bazındadır." />
+          <ExplorerEmpty icon={<Factory size={25} />} loading={detailLoading} title={en ? "Select a power plant" : "Bir santral seçin"} detail={en ? "A plant selection opens actual generation and UEVM records. Planning data remains UEVÇB-level in the Planning view, matching the official publication level." : "Santral seçimi gerçekleşen üretim ve UEVM kayıtlarını açar. Plan verileri, resmî yayın seviyesine uygun olarak Planlama görünümünde UEVÇB bazındadır."} locale={locale} />
         )}
       </EntityExplorerLayout>
     );
   }
 
   const planning = selectedPlanningDetail;
-  const planningSeries = planningLayer === "production" ? ORGANIZATION_SERIES : CONSUMPTION_SERIES;
+  const planningSeries = planningLayer === "production" ? ORGANIZATION_SERIES : en ? CONSUMPTION_SERIES_EN : CONSUMPTION_SERIES;
   const planningRevision = pairedDifference(planning?.points, "kudup", "kgup");
   const planningRevisionCoverage = pairedCoverage(planning?.points, "kudup", "kgup");
   const consumptionDeviation = pairedDifference(planning?.points, "realtimeConsumption", "loadPlan");
@@ -349,15 +365,15 @@ export function TransparencyWorkspace({
     <section className="planning-workspace view-enter">
       <div className="planning-commandbar">
         <div>
-          <span className="eyebrow">PLAN / GERÇEKLEŞEN</span>
-          <h2>Operasyonel planlama masası</h2>
-          <p>Üretim plan revizyonlarını ve sistem tüketim tahminini resmî yayın seviyelerinde karşılaştırın.</p>
+          <span className="eyebrow">{en ? "PLAN / ACTUAL" : "PLAN / GERÇEKLEŞEN"}</span>
+          <h2>{en ? "Operational planning desk" : "Operasyonel planlama masası"}</h2>
+          <p>{en ? "Compare generation-plan revisions and system consumption forecasts at their official publication levels." : "Üretim plan revizyonlarını ve sistem tüketim tahminini resmî yayın seviyelerinde karşılaştırın."}</p>
         </div>
         <div className="planning-scope-controls">
           <label>
-            Üretim kapsamı
+            {en ? "Generation scope" : "Üretim kapsamı"}
             <select value={selectedOrganizationId ?? ""} onChange={(event) => selectPlanningOrganization(event.target.value)}>
-              <option value="">Türkiye geneli</option>
+              <option value="">{en ? "Türkiye total" : "Türkiye geneli"}</option>
               {catalog?.organizations.map((organization) => (
                 <option value={organization.id} key={organization.id}>{organization.shortName || organization.name}</option>
               ))}
@@ -370,7 +386,7 @@ export function TransparencyWorkspace({
               onChange={(event) => setSelectedUevcbId(event.target.value ? Number(event.target.value) : null)}
               disabled={!selectedOrganizationId || !planningUevcbs.length}
             >
-              <option value="">Tüm UEVÇB’ler</option>
+              <option value="">{en ? "All UEVÇB units" : "Tüm UEVÇB’ler"}</option>
               {planningUevcbs.map((unit) => <option value={unit.id} key={unit.id}>{unit.name}</option>)}
             </select>
           </label>
@@ -378,22 +394,22 @@ export function TransparencyWorkspace({
       </div>
 
       {error && <InlineWarning message={error} />}
-      {planning?.warnings.map((warning, index) => <InlineWarning key={`${warning}-${index}`} message={warning} subtle />)}
+      {planning?.warnings.map((warning, index) => <InlineWarning key={`${warning}-${index}`} message={localizedExplorerWarning(warning, locale)} subtle />)}
 
       <div className="planning-kpi-band">
         {planningLayer === "production" ? (
           <>
-            <MetricCard label="Yayımlanan KGÜP" value={formatMwh(sumMetric(planning?.points, "kgup"))} meta={`${coverage(planning?.points, "kgup")}/24 saat · ilk program`} />
-            <MetricCard label="Yayımlanan KUDÜP" value={formatMwh(sumMetric(planning?.points, "kudup"))} meta={`${coverage(planning?.points, "kudup")}/24 saat · güncel program`} />
-            <MetricCard label="Plan revizyonu" value={formatSignedMwh(planningRevision)} meta={`${planningRevisionCoverage}/24 ortak saat · KUDÜP − KGÜP`} trend={planningRevision} />
-            <MetricCard label="EAK kapsamı" value={`${coverage(planning?.points, "eak")}/24`} meta="Eksik saatler sıfır değildir" />
+            <MetricCard label={en ? "Published KGÜP" : "Yayımlanan KGÜP"} value={formatMwh(sumMetric(planning?.points, "kgup"), locale)} meta={en ? `${coverage(planning?.points, "kgup")}/24 hours · initial schedule` : `${coverage(planning?.points, "kgup")}/24 saat · ilk program`} />
+            <MetricCard label={en ? "Published KUDÜP" : "Yayımlanan KUDÜP"} value={formatMwh(sumMetric(planning?.points, "kudup"), locale)} meta={en ? `${coverage(planning?.points, "kudup")}/24 hours · current schedule` : `${coverage(planning?.points, "kudup")}/24 saat · güncel program`} />
+            <MetricCard label={en ? "Plan revision" : "Plan revizyonu"} value={formatSignedMwh(planningRevision, locale)} meta={en ? `${planningRevisionCoverage}/24 paired hours · KUDÜP − KGÜP` : `${planningRevisionCoverage}/24 ortak saat · KUDÜP − KGÜP`} trend={planningRevision} />
+            <MetricCard label={en ? "EAK coverage" : "EAK kapsamı"} value={`${coverage(planning?.points, "eak")}/24`} meta={en ? "Missing hours are not zero" : "Eksik saatler sıfır değildir"} />
           </>
         ) : (
           <>
-            <MetricCard label="Yayımlanan yük planı" value={formatMwh(sumMetric(planning?.points, "loadPlan"))} meta={`${coverage(planning?.points, "loadPlan")}/24 sistem saati`} />
-            <MetricCard label="Yayımlanan tüketim" value={formatMwh(sumMetric(planning?.points, "realtimeConsumption"))} meta={`${coverage(planning?.points, "realtimeConsumption")}/24 sistem saati`} />
-            <MetricCard label="Plan sapması" value={formatSignedMwh(consumptionDeviation)} meta={`${consumptionCoverage}/24 ortak saat · gerçekleşen − plan`} trend={consumptionDeviation} />
-            <MetricCard label="Ortak veri kapsamı" value={`${consumptionCoverage}/24`} meta="Türkiye sistemi" />
+            <MetricCard label={en ? "Published load plan" : "Yayımlanan yük planı"} value={formatMwh(sumMetric(planning?.points, "loadPlan"), locale)} meta={en ? `${coverage(planning?.points, "loadPlan")}/24 system hours` : `${coverage(planning?.points, "loadPlan")}/24 sistem saati`} />
+            <MetricCard label={en ? "Published consumption" : "Yayımlanan tüketim"} value={formatMwh(sumMetric(planning?.points, "realtimeConsumption"), locale)} meta={en ? `${coverage(planning?.points, "realtimeConsumption")}/24 system hours` : `${coverage(planning?.points, "realtimeConsumption")}/24 sistem saati`} />
+            <MetricCard label={en ? "Plan deviation" : "Plan sapması"} value={formatSignedMwh(consumptionDeviation, locale)} meta={en ? `${consumptionCoverage}/24 paired hours · actual − plan` : `${consumptionCoverage}/24 ortak saat · gerçekleşen − plan`} trend={consumptionDeviation} />
+            <MetricCard label={en ? "Paired data coverage" : "Ortak veri kapsamı"} value={`${consumptionCoverage}/24`} meta={en ? "Türkiye system" : "Türkiye sistemi"} />
           </>
         )}
       </div>
@@ -401,19 +417,20 @@ export function TransparencyWorkspace({
       <div className="planning-panel">
         <div className="panel-title-row">
           <div>
-            <span className="eyebrow">{planningLayer === "production" ? "ÜRETİM PROGRAMI" : "SİSTEM TÜKETİMİ"}</span>
-            <h3>{planningLayer === "production" ? "Plan versiyonları ve emre amade kapasite" : "Yük tahmin planı ve gerçekleşen tüketim"}</h3>
+            <span className="eyebrow">{planningLayer === "production" ? en ? "GENERATION SCHEDULE" : "ÜRETİM PROGRAMI" : en ? "SYSTEM CONSUMPTION" : "SİSTEM TÜKETİMİ"}</span>
+            <h3>{planningLayer === "production" ? en ? "Plan versions and available capacity" : "Plan versiyonları ve emre amade kapasite" : en ? "Load forecast plan and actual consumption" : "Yük tahmin planı ve gerçekleşen tüketim"}</h3>
           </div>
-          <div className="segment-control" role="group" aria-label="Planlama katmanı">
-            <button type="button" className={planningLayer === "production" ? "active" : ""} onClick={() => setPlanningLayer("production")}>Üretim</button>
-            <button type="button" className={planningLayer === "consumption" ? "active" : ""} onClick={() => setPlanningLayer("consumption")}>Tüketim · Sistem</button>
+          <div className="segment-control" role="group" aria-label={en ? "Planning layer" : "Planlama katmanı"}>
+            <button type="button" className={planningLayer === "production" ? "active" : ""} onClick={() => setPlanningLayer("production")}>{en ? "Generation" : "Üretim"}</button>
+            <button type="button" className={planningLayer === "consumption" ? "active" : ""} onClick={() => setPlanningLayer("consumption")}>{en ? "Consumption · System" : "Tüketim · Sistem"}</button>
           </div>
         </div>
         <PlanningChart
           points={planning?.points ?? []}
           series={planningSeries}
-          label={planningLayer === "production" ? "Saatlik KGÜP, KUDÜP ve EAK" : "Saatlik sistem yük tahmini ve gerçekleşen tüketim"}
+          label={planningLayer === "production" ? en ? "Hourly KGÜP, KUDÜP, and EAK" : "Saatlik KGÜP, KUDÜP ve EAK" : en ? "Hourly system load forecast and actual consumption" : "Saatlik sistem yük tahmini ve gerçekleşen tüketim"}
           loading={detailLoading}
+          locale={locale}
         />
       </div>
 
@@ -427,21 +444,22 @@ export function TransparencyWorkspace({
                 { key: "eak", label: "EAK" },
               ]
             : [
-                { key: "loadPlan", label: "Yük planı" },
-                { key: "realtimeConsumption", label: "Gerçekleşen" },
+                { key: "loadPlan", label: en ? "Load plan" : "Yük planı" },
+                { key: "realtimeConsumption", label: en ? "Actual" : "Gerçekleşen" },
               ]}
+          locale={locale}
         />
         <aside className="scope-explainer">
-          <span className="eyebrow">KAPSAM SINIRI</span>
-          <h3>{planningLayer === "production" ? "Üretim planı UEVÇB düzeyine iner" : "Tüketim planı sistem seviyesindedir"}</h3>
+          <span className="eyebrow">{en ? "SCOPE BOUNDARY" : "KAPSAM SINIRI"}</span>
+          <h3>{planningLayer === "production" ? en ? "Generation plans reach UEVÇB level" : "Üretim planı UEVÇB düzeyine iner" : en ? "Consumption plans are system-level" : "Tüketim planı sistem seviyesindedir"}</h3>
           <p>{planningLayer === "production"
-            ? "Organizasyon veya UEVÇB seçimi yalnız KGÜP, KUDÜP ve EAK serilerini filtreler. Eksik kayıtlar sıfır olarak yorumlanmaz."
-            : "EPİAŞ yük tahmin planı organizasyon ya da santral tüketim planı değildir. Seçili varlık için yalnız piyasa bağlamı sağlar."}</p>
+            ? en ? "Selecting an organization or UEVÇB filters only KGÜP, KUDÜP, and EAK. Missing records are not interpreted as zero." : "Organizasyon veya UEVÇB seçimi yalnız KGÜP, KUDÜP ve EAK serilerini filtreler. Eksik kayıtlar sıfır olarak yorumlanmaz."
+            : en ? "The EPİAŞ load forecast is not an organization or plant consumption plan. It provides system-market context only." : "EPİAŞ yük tahmin planı organizasyon ya da santral tüketim planı değildir. Seçili varlık için yalnız piyasa bağlamı sağlar."}</p>
           <dl>
-            <div><dt>Yayın</dt><dd>EPİAŞ Şeffaflık 2.0</dd></div>
-            <div><dt>Zaman dilimi</dt><dd>Europe/Istanbul · UTC+3</dd></div>
-            <div><dt>Veri günü</dt><dd>{date}</dd></div>
-            <div><dt>Durum</dt><dd><i /> {planning?.mode === "live" ? "Canlı / resmî" : "Sentetik gösterim"}</dd></div>
+            <div><dt>{en ? "Publisher" : "Yayın"}</dt><dd>EPİAŞ Transparency 2.0</dd></div>
+            <div><dt>{en ? "Time zone" : "Zaman dilimi"}</dt><dd>Europe/Istanbul · UTC+3</dd></div>
+            <div><dt>{en ? "Data day" : "Veri günü"}</dt><dd>{date}</dd></div>
+            <div><dt>{en ? "Status" : "Durum"}</dt><dd><i /> {planning?.mode === "live" ? en ? "Live / official" : "Canlı / resmî" : en ? "Synthetic demonstration" : "Sentetik gösterim"}</dd></div>
           </dl>
         </aside>
       </div>
@@ -462,6 +480,7 @@ function EntityExplorerLayout({
   source,
   list,
   children,
+  locale,
 }: {
   title: string;
   description: string;
@@ -475,27 +494,29 @@ function EntityExplorerLayout({
   source?: ExplorerResponse["source"];
   list: React.ReactNode;
   children: React.ReactNode;
+  locale: Locale;
 }) {
+  const en = locale === "en";
   return (
     <section className="entity-explorer view-enter">
       <aside className="entity-index">
         <div className="entity-index-heading">
           <span className="entity-index-icon">{icon}</span>
-          <div><span className="eyebrow">VARLIK DİZİNİ</span><h2>{title}</h2></div>
+          <div><span className="eyebrow">{en ? "ASSET DIRECTORY" : "VARLIK DİZİNİ"}</span><h2>{title}</h2></div>
         </div>
         <p>{description}</p>
         <label className="entity-search">
           <Search size={15} />
-          <input value={query} onChange={(event) => onQuery(event.target.value)} placeholder="Ad, kısa ad veya EIC ara" />
-          <span>{loading ? <LoaderCircle className="spin" size={14} /> : `${visible.toLocaleString("tr-TR")} / ${total.toLocaleString("tr-TR")}`}</span>
+          <input value={query} onChange={(event) => onQuery(event.target.value)} placeholder={en ? "Search name, short name, or EIC" : "Ad, kısa ad veya EIC ara"} />
+          <span>{loading ? <LoaderCircle className="spin" size={14} /> : `${visible.toLocaleString(en ? "en-US" : "tr-TR")} / ${total.toLocaleString(en ? "en-US" : "tr-TR")}`}</span>
         </label>
         {!loading && !query.trim() && visible < total && (
-          <p className="entity-limit-note">İlk {visible.toLocaleString("tr-TR")} kayıt gösteriliyor. Tüm katalogda ad veya EIC ile arayın.</p>
+          <p className="entity-limit-note">{en ? `Showing the first ${visible.toLocaleString("en-US")} records. Search the full catalog by name or EIC.` : `İlk ${visible.toLocaleString("tr-TR")} kayıt gösteriliyor. Tüm katalogda ad veya EIC ile arayın.`}</p>
         )}
         <div className="entity-list">{list}</div>
         <div className="entity-source">
           <Database size={14} />
-          <span><b>{source?.provider ?? "EPİAŞ Şeffaflık 2.0"}</b><small>{source ? formatTimestamp(source.fetchedAt) : "Kaynak bekleniyor"}</small></span>
+          <span><b>{source?.provider ?? "EPİAŞ Transparency 2.0"}</b><small>{source ? formatTimestamp(source.fetchedAt, locale) : en ? "Waiting for source" : "Kaynak bekleniyor"}</small></span>
         </div>
       </aside>
       <div className="entity-detail">
@@ -506,68 +527,71 @@ function EntityExplorerLayout({
   );
 }
 
-function OrganizationDetail({ response, loading }: { response: OrganizationExplorerResponse; loading: boolean }) {
+function OrganizationDetail({ response, loading, locale }: { response: OrganizationExplorerResponse; loading: boolean; locale: Locale }) {
+  const en = locale === "en";
   const revision = pairedDifference(response.points, "kudup", "kgup");
   const revisionCoverage = pairedCoverage(response.points, "kudup", "kgup");
   const participation = participationLabels(response.participation);
   return (
     <div className={`detail-canvas ${loading ? "is-loading" : ""}`}>
       <header className="detail-hero">
-        <div className="detail-identity"><span><Building2 size={21} /></span><div><span className="eyebrow">ORGANİZASYON / {response.organization.status || "DURUM BİLİNMİYOR"}</span><h2>{response.organization.name}</h2><p>{response.organization.eic || "EIC yayımlanmamış"} · ID {response.organization.id}</p></div></div>
+        <div className="detail-identity"><span><Building2 size={21} /></span><div><span className="eyebrow">{en ? "ORGANIZATION" : "ORGANİZASYON"} / {localizedOrganizationStatus(response.organization.status, locale)}</span><h2>{response.organization.name}</h2><p>{response.organization.eic || (en ? "EIC not published" : "EIC yayımlanmamış")} · ID {response.organization.id}</p></div></div>
         <div className="participation-row">
-          {participation.length ? participation.map((item) => <span key={item.label} className={item.active ? "active" : ""}>{item.active && <Check size={11} />}{item.label}</span>) : <span>Katılım kaydı bulunamadı</span>}
+          {participation.length ? participation.map((item) => <span key={item.label} className={item.active ? "active" : ""}>{item.active && <Check size={11} />}{item.label}</span>) : <span>{en ? "No participation record" : "Katılım kaydı bulunamadı"}</span>}
         </div>
       </header>
-      {response.warnings.map((warning, index) => <InlineWarning key={`${warning}-${index}`} message={warning} subtle />)}
+      {response.warnings.map((warning, index) => <InlineWarning key={`${warning}-${index}`} message={localizedExplorerWarning(warning, locale)} subtle />)}
       <div className="detail-metrics">
-        <MetricCard label="Bağlı UEVÇB" value={response.uevcbs.length.toLocaleString("tr-TR")} meta="Resmî organizasyon eşlemesi" />
-        <MetricCard label="GÖP eşleşen alış" value={formatMwh(sumMetric(response.points, "matchedBids"))} meta={`${coverage(response.points, "matchedBids")}/24 yayımlanan saat`} />
-        <MetricCard label="GÖP eşleşen satış" value={formatMwh(sumMetric(response.points, "matchedOffers"))} meta={`${coverage(response.points, "matchedOffers")}/24 yayımlanan saat`} />
-        <MetricCard label="Plan revizyonu" value={formatSignedMwh(revision)} meta={`${revisionCoverage}/24 ortak saat · KUDÜP − KGÜP`} trend={revision} />
+        <MetricCard label={en ? "Linked UEVÇB" : "Bağlı UEVÇB"} value={response.uevcbs.length.toLocaleString(en ? "en-US" : "tr-TR")} meta={en ? "Official organization mapping" : "Resmî organizasyon eşlemesi"} />
+        <MetricCard label={en ? "DAM matched buy" : "GÖP eşleşen alış"} value={formatMwh(sumMetric(response.points, "matchedBids"), locale)} meta={en ? `${coverage(response.points, "matchedBids")}/24 published hours` : `${coverage(response.points, "matchedBids")}/24 yayımlanan saat`} />
+        <MetricCard label={en ? "DAM matched sell" : "GÖP eşleşen satış"} value={formatMwh(sumMetric(response.points, "matchedOffers"), locale)} meta={en ? `${coverage(response.points, "matchedOffers")}/24 published hours` : `${coverage(response.points, "matchedOffers")}/24 yayımlanan saat`} />
+        <MetricCard label={en ? "Plan revision" : "Plan revizyonu"} value={formatSignedMwh(revision, locale)} meta={en ? `${revisionCoverage}/24 paired hours · KUDÜP − KGÜP` : `${revisionCoverage}/24 ortak saat · KUDÜP − KGÜP`} trend={revision} />
       </div>
       <div className="detail-panel">
-        <div className="panel-title-row"><div><span className="eyebrow">ÜRETİM PLANLAMA</span><h3>KGÜP, KUDÜP ve EAK</h3></div><span className="coverage-badge"><i /> {coverage(response.points, "kgup")}/24 saat</span></div>
-        <PlanningChart points={response.points} series={ORGANIZATION_SERIES} label="Organizasyon bazlı saatlik üretim planı" loading={loading} />
+        <div className="panel-title-row"><div><span className="eyebrow">{en ? "GENERATION PLANNING" : "ÜRETİM PLANLAMA"}</span><h3>KGÜP, KUDÜP {en ? "and" : "ve"} EAK</h3></div><span className="coverage-badge"><i /> {coverage(response.points, "kgup")}/24 {en ? "hours" : "saat"}</span></div>
+        <PlanningChart points={response.points} series={ORGANIZATION_SERIES} label={en ? "Organization-level hourly generation plan" : "Organizasyon bazlı saatlik üretim planı"} loading={loading} locale={locale} />
       </div>
       <div className="detail-lower-grid">
-        <DataTable points={response.points} columns={[{ key: "matchedBids", label: "GÖP alış" }, { key: "matchedOffers", label: "GÖP satış" }, { key: "kgup", label: "KGÜP" }, { key: "kudup", label: "KUDÜP" }]} />
-        <aside className="unit-list-panel"><div><span className="eyebrow">BAĞLI ÜRETİM BİRİMLERİ</span><b>{response.uevcbs.length} UEVÇB</b></div>{response.uevcbs.slice(0, 10).map((unit) => <div className="unit-row" key={unit.id}><span><Gauge size={14} /></span><div><b>{unit.name}</b><small>{unit.eic || `UEVÇB ${unit.id}`}</small></div></div>)}{response.uevcbs.length > 10 && <p>+ {response.uevcbs.length - 10} kayıt daha</p>}</aside>
+        <DataTable points={response.points} columns={[{ key: "matchedBids", label: en ? "DAM buy" : "GÖP alış" }, { key: "matchedOffers", label: en ? "DAM sell" : "GÖP satış" }, { key: "kgup", label: "KGÜP" }, { key: "kudup", label: "KUDÜP" }]} locale={locale} />
+        <aside className="unit-list-panel"><div><span className="eyebrow">{en ? "LINKED GENERATION UNITS" : "BAĞLI ÜRETİM BİRİMLERİ"}</span><b>{response.uevcbs.length} UEVÇB</b></div>{response.uevcbs.slice(0, 10).map((unit) => <div className="unit-row" key={unit.id}><span><Gauge size={14} /></span><div><b>{unit.name}</b><small>{unit.eic || `UEVÇB ${unit.id}`}</small></div></div>)}{response.uevcbs.length > 10 && <p>+ {response.uevcbs.length - 10} {en ? "more records" : "kayıt daha"}</p>}</aside>
       </div>
     </div>
   );
 }
 
-function PlantDetail({ response, loading }: { response: PlantExplorerResponse; loading: boolean }) {
+function PlantDetail({ response, loading, locale }: { response: PlantExplorerResponse; loading: boolean; locale: Locale }) {
+  const en = locale === "en";
   return (
     <div className={`detail-canvas ${loading ? "is-loading" : ""}`}>
       <header className="detail-hero">
-        <div className="detail-identity"><span><Factory size={21} /></span><div><span className="eyebrow">SANTRAL / GERÇEKLEŞEN</span><h2>{response.plant.name}</h2><p>{response.plant.eic || "EIC yayımlanmamış"} · ID {response.plant.id}</p></div></div>
-        <span className="coverage-badge"><i /> G+1 yayın takvimi</span>
+        <div className="detail-identity"><span><Factory size={21} /></span><div><span className="eyebrow">{en ? "POWER PLANT / ACTUAL" : "SANTRAL / GERÇEKLEŞEN"}</span><h2>{response.plant.name}</h2><p>{response.plant.eic || (en ? "EIC not published" : "EIC yayımlanmamış")} · ID {response.plant.id}</p></div></div>
+        <span className="coverage-badge"><i /> {en ? "D+1 publication schedule" : "G+1 yayın takvimi"}</span>
       </header>
-      {response.warnings.map((warning, index) => <InlineWarning key={`${warning}-${index}`} message={warning} subtle />)}
+      {response.warnings.map((warning, index) => <InlineWarning key={`${warning}-${index}`} message={localizedExplorerWarning(warning, locale)} subtle />)}
       <div className="detail-metrics">
-        <MetricCard label="Yayımlanan üretim" value={formatMwh(sumMetric(response.points, "realtimeGeneration"))} meta={`${coverage(response.points, "realtimeGeneration")}/24 saat`} />
-        <MetricCard label="Saatlik tepe" value={formatMwh(maxMetric(response.points, "realtimeGeneration"))} meta="Gerçek zamanlı üretim" />
-        <MetricCard label="Yayımlanan UEVM" value={formatMwh(sumMetric(response.points, "injectionQuantity"))} meta={`${coverage(response.points, "injectionQuantity")}/24 saat · uzlaştırma`} />
-        <MetricCard label="Veri kapsamı" value={`${coverage(response.points, "realtimeGeneration")}/24`} meta="Eksik saatler sıfır değildir" />
+        <MetricCard label={en ? "Published generation" : "Yayımlanan üretim"} value={formatMwh(sumMetric(response.points, "realtimeGeneration"), locale)} meta={`${coverage(response.points, "realtimeGeneration")}/24 ${en ? "hours" : "saat"}`} />
+        <MetricCard label={en ? "Hourly peak" : "Saatlik tepe"} value={formatMwh(maxMetric(response.points, "realtimeGeneration"), locale)} meta={en ? "Actual generation" : "Gerçek zamanlı üretim"} />
+        <MetricCard label={en ? "Published UEVM" : "Yayımlanan UEVM"} value={formatMwh(sumMetric(response.points, "injectionQuantity"), locale)} meta={en ? `${coverage(response.points, "injectionQuantity")}/24 hours · settlement` : `${coverage(response.points, "injectionQuantity")}/24 saat · uzlaştırma`} />
+        <MetricCard label={en ? "Data coverage" : "Veri kapsamı"} value={`${coverage(response.points, "realtimeGeneration")}/24`} meta={en ? "Missing hours are not zero" : "Eksik saatler sıfır değildir"} />
       </div>
       <div className="detail-panel">
-        <div className="panel-title-row"><div><span className="eyebrow">SANTRAL KAYDI</span><h3>Gerçekleşen üretim ve UEVM</h3></div><span className="data-level-badge">SANTRAL BAZI</span></div>
-        <PlanningChart points={response.points} series={PLANT_SERIES} label="Santral bazlı saatlik üretim ve uzlaştırma verisi" loading={loading} />
+        <div className="panel-title-row"><div><span className="eyebrow">{en ? "PLANT RECORD" : "SANTRAL KAYDI"}</span><h3>{en ? "Actual generation and UEVM" : "Gerçekleşen üretim ve UEVM"}</h3></div><span className="data-level-badge">{en ? "PLANT LEVEL" : "SANTRAL BAZI"}</span></div>
+        <PlanningChart points={response.points} series={en ? PLANT_SERIES_EN : PLANT_SERIES} label={en ? "Plant-level hourly generation and settlement data" : "Santral bazlı saatlik üretim ve uzlaştırma verisi"} loading={loading} locale={locale} />
       </div>
-      <DataTable points={response.points} columns={[{ key: "realtimeGeneration", label: "Gerçekleşen üretim" }, { key: "injectionQuantity", label: "UEVM" }]} />
+      <DataTable points={response.points} columns={[{ key: "realtimeGeneration", label: en ? "Actual generation" : "Gerçekleşen üretim" }, { key: "injectionQuantity", label: "UEVM" }]} locale={locale} />
     </div>
   );
 }
 
-function DataTable({ points, columns }: { points: ExplorerPoint[]; columns: Array<{ key: ExplorerMetricKey; label: string }> }) {
+function DataTable({ points, columns, locale }: { points: ExplorerPoint[]; columns: Array<{ key: ExplorerMetricKey; label: string }>; locale: Locale }) {
+  const en = locale === "en";
   return (
     <div className="data-table-shell">
-      <div className="table-heading"><span className="eyebrow">SAATLİK KAYITLAR</span><b>{points.length} satır</b></div>
+      <div className="table-heading"><span className="eyebrow">{en ? "HOURLY RECORDS" : "SAATLİK KAYITLAR"}</span><b>{points.length} {en ? "rows" : "satır"}</b></div>
       <div className="data-table-scroll">
         <table className="data-table">
-          <thead><tr><th>Saat</th>{columns.map((column) => <th key={column.key}>{column.label}<small>MWh</small></th>)}</tr></thead>
-          <tbody>{points.map((point, index) => <tr key={`${point.timestamp}-${index}`}><td><b>{point.hour}</b><small>{shortDate(point.timestamp)}</small></td>{columns.map((column) => <td key={column.key}>{formatNumber(point[column.key])}</td>)}</tr>)}</tbody>
+          <thead><tr><th>{en ? "Hour" : "Saat"}</th>{columns.map((column) => <th key={column.key}>{column.label}<small>MWh</small></th>)}</tr></thead>
+          <tbody>{points.map((point, index) => <tr key={`${point.timestamp}-${index}`}><td><b>{point.hour}</b><small>{shortDate(point.timestamp, locale)}</small></td>{columns.map((column) => <td key={column.key}>{formatNumber(point[column.key], locale)}</td>)}</tr>)}</tbody>
         </table>
       </div>
     </div>
@@ -578,12 +602,41 @@ function MetricCard({ label, value, meta, trend }: { label: string; value: strin
   return <div className="metric-card"><span>{label}</span><strong>{value}</strong><small>{typeof trend === "number" ? (trend > 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />) : null}{meta}</small></div>;
 }
 
-function ExplorerEmpty({ icon, loading, title, detail }: { icon: React.ReactNode; loading: boolean; title: string; detail: string }) {
-  return <div className="explorer-empty"><span>{loading ? <LoaderCircle className="spin" size={25} /> : icon}</span><h2>{loading ? "Resmî veri hazırlanıyor" : title}</h2><p>{loading ? "EPİAŞ servisleri sırayla okunuyor; eksik seriler ayrı uyarı olarak korunacak." : detail}</p></div>;
+function ExplorerEmpty({ icon, loading, title, detail, locale }: { icon: React.ReactNode; loading: boolean; title: string; detail: string; locale: Locale }) {
+  const en = locale === "en";
+  return <div className="explorer-empty"><span>{loading ? <LoaderCircle className="spin" size={25} /> : icon}</span><h2>{loading ? en ? "Preparing official data" : "Resmî veri hazırlanıyor" : title}</h2><p>{loading ? en ? "Reading EPİAŞ services in sequence; missing series remain visible as separate warnings." : "EPİAŞ servisleri sırayla okunuyor; eksik seriler ayrı uyarı olarak korunacak." : detail}</p></div>;
 }
 
 function InlineWarning({ message, subtle = false }: { message: string; subtle?: boolean }) {
   return <div className={`workspace-warning ${subtle ? "subtle" : ""}`} role={subtle ? "status" : "alert"}><CircleAlert size={14} /><span>{message}</span></div>;
+}
+
+function localizedOrganizationStatus(value: string | null | undefined, locale: Locale): string {
+  if (locale === "tr") return value || "DURUM BİLİNMİYOR";
+  if (!value) return "STATUS UNKNOWN";
+  const normalized = value.trim().toLocaleLowerCase("tr-TR");
+  if (normalized === "onaylı" || normalized === "onayli") return "VERIFIED";
+  if (normalized === "aktif") return "ACTIVE";
+  if (normalized === "pasif") return "INACTIVE";
+  return value;
+}
+
+function localizedExplorerWarning(value: string, locale: Locale): string {
+  if (locale === "tr") return value;
+  const exact: Record<string, string> = {
+    "EPİAŞ yayın gecikmeleri nedeniyle en yeni saatlerde değerler boş olabilir; boş değerler sıfıra çevrilmez.":
+      "The newest hours may be blank because of EPİAŞ publication delays; missing values are not converted to zero.",
+    "Santral veriş miktarı seçilen kapsam için kayıt döndürmedi.":
+      "Plant injection quantity returned no records for the selected scope.",
+    "Veriş miktarı yanıtında saatlik sayısal değer bulunamadı.":
+      "No numeric hourly values were found in the injection-quantity response.",
+  };
+  if (exact[value]) return exact[value];
+  const ignoredLoadPlan = /^Yük tahmin planı yanıtındaki seçili (\d{4}-\d{2}-\d{2}) günü dışındaki (\d+) kayıt yok sayıldı\.$/.exec(value);
+  if (ignoredLoadPlan) {
+    return `${ignoredLoadPlan[2]} load-plan records outside the selected ${ignoredLoadPlan[1]} day were ignored.`;
+  }
+  return value;
 }
 
 function participationLabels(value: unknown): Array<{ label: string; active: boolean }> {
@@ -627,28 +680,28 @@ function coverage(points: ExplorerPoint[] | undefined, key: ExplorerMetricKey): 
   return points?.filter((point) => isNumber(point[key])).length ?? 0;
 }
 
-function formatMwh(value: number | null): string {
-  return value === null ? "—" : `${formatNumber(value)} MWh`;
+function formatMwh(value: number | null, locale: Locale): string {
+  return value === null ? "—" : `${formatNumber(value, locale)} MWh`;
 }
 
-function formatSignedMwh(value: number | null): string {
+function formatSignedMwh(value: number | null, locale: Locale): string {
   if (value === null) return "—";
-  return `${value > 0 ? "+" : ""}${formatNumber(value)} MWh`;
+  return `${value > 0 ? "+" : ""}${formatNumber(value, locale)} MWh`;
 }
 
-function formatNumber(value: unknown): string {
-  return isNumber(value) ? new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 }).format(value) : "—";
+function formatNumber(value: unknown, locale: Locale): string {
+  return isNumber(value) ? new Intl.NumberFormat(locale === "en" ? "en-US" : "tr-TR", { maximumFractionDigits: 1 }).format(value) : "—";
 }
 
-function formatTimestamp(value: string): string {
+function formatTimestamp(value: string, locale: Locale): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Istanbul" }).format(parsed);
+  return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "tr-TR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Istanbul" }).format(parsed);
 }
 
-function shortDate(value: string): string {
+function shortDate(value: string, locale: Locale): string {
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? "" : new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", timeZone: "Europe/Istanbul" }).format(parsed);
+  return Number.isNaN(parsed.getTime()) ? "" : new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "tr-TR", { day: "2-digit", month: "short", timeZone: "Europe/Istanbul" }).format(parsed);
 }
 
 function isNumber(value: unknown): value is number {

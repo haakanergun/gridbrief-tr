@@ -52,6 +52,8 @@ export function useWebMcp({
   comparePlanActual,
   stressTestPosition,
   draftShiftBrief,
+  searchTransparencyDatasets,
+  getTransparencyDataset,
   onActivity,
   enabled = true,
 }: UseWebMcpOptions): UseWebMcpResult {
@@ -62,6 +64,8 @@ export function useWebMcp({
     comparePlanActual,
     stressTestPosition,
     draftShiftBrief,
+    searchTransparencyDatasets,
+    getTransparencyDataset,
   });
   const onActivityRef = useRef(onActivity);
   const [status, setStatus] = useState<WebMcpRegistrationStatus>("checking");
@@ -75,6 +79,8 @@ export function useWebMcp({
       comparePlanActual,
       stressTestPosition,
       draftShiftBrief,
+      searchTransparencyDatasets,
+      getTransparencyDataset,
     };
     onActivityRef.current = onActivity;
   }, [
@@ -85,6 +91,8 @@ export function useWebMcp({
     comparePlanActual,
     stressTestPosition,
     draftShiftBrief,
+    searchTransparencyDatasets,
+    getTransparencyDataset,
   ]);
 
   useEffect(() => {
@@ -131,6 +139,10 @@ export function useWebMcp({
         handlersRef.current.stressTestPosition(input, context),
       draftShiftBrief: (input, context) =>
         handlersRef.current.draftShiftBrief(input, context),
+      searchTransparencyDatasets: (input, context) =>
+        handlersRef.current.searchTransparencyDatasets(input, context),
+      getTransparencyDataset: (input, context) =>
+        handlersRef.current.getTransparencyDataset(input, context),
     };
 
     const activityProxy: WebMcpActivityListener = (event) =>

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ExplorerPoint } from "@/lib/explorer";
+import type { Locale } from "@/i18n/locale";
 
 export type ExplorerMetricKey =
   | "matchedBids"
@@ -27,6 +28,7 @@ interface PlanningChartProps {
   unit?: string;
   label: string;
   loading?: boolean;
+  locale?: Locale;
 }
 
 const WIDTH = 980;
@@ -42,7 +44,9 @@ export function PlanningChart({
   unit = "MWh",
   label,
   loading = false,
+  locale = "tr",
 }: PlanningChartProps) {
+  const en = locale === "en";
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const chart = useMemo(() => buildChart(points, series), [points, series]);
   const hasVisibleValues = useMemo(
@@ -60,12 +64,12 @@ export function PlanningChart({
   }
 
   if (!points.length || !hasVisibleValues) {
-    return <div className="planning-chart-empty">Bu kapsam için yayımlanmış saatlik kayıt bulunamadı.</div>;
+    return <div className="planning-chart-empty">{en ? "No published hourly records for this scope." : "Bu kapsam için yayımlanmış saatlik kayıt bulunamadı."}</div>;
   }
 
   return (
     <div className={`planning-chart-shell ${loading ? "is-loading" : ""}`}>
-      <div className="planning-chart-legend" aria-label="Grafik lejandı">
+      <div className="planning-chart-legend" aria-label={en ? "Chart legend" : "Grafik lejandı"}>
         <div>
           {series.map((item) => (
             <span key={item.key}>
@@ -94,7 +98,7 @@ export function PlanningChart({
           <g key={tick.value}>
             <line x1={LEFT} x2={WIDTH - RIGHT} y1={tick.y} y2={tick.y} className="planning-grid-line" />
             <text x={LEFT - 12} y={tick.y + 4} textAnchor="end" className="planning-axis-label">
-              {formatCompact(tick.value)}
+              {formatCompact(tick.value, locale)}
             </text>
           </g>
         ))}
@@ -140,7 +144,7 @@ export function PlanningChart({
             <span key={item.key}>
               <i className={`tooltip-dot tone-${item.tone}`} />
               {item.label}
-              <strong>{formatMetric(active[item.key])} {unit}</strong>
+              <strong>{formatMetric(active[item.key], locale)} {unit}</strong>
             </span>
           ))}
         </div>
@@ -193,10 +197,10 @@ function isNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function formatMetric(value: unknown): string {
-  return isNumber(value) ? new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 }).format(value) : "—";
+function formatMetric(value: unknown, locale: Locale): string {
+  return isNumber(value) ? new Intl.NumberFormat(locale === "en" ? "en-US" : "tr-TR", { maximumFractionDigits: 1 }).format(value) : "—";
 }
 
-function formatCompact(value: number): string {
-  return new Intl.NumberFormat("tr-TR", { notation: "compact", maximumFractionDigits: 1 }).format(value);
+function formatCompact(value: number, locale: Locale): string {
+  return new Intl.NumberFormat(locale === "en" ? "en-US" : "tr-TR", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }

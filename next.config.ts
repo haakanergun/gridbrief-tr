@@ -5,6 +5,7 @@ const isGitHubPagesStaticDemo = process.env.GITHUB_PAGES === "true"
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  allowedDevOrigins: ["127.0.0.1"],
   ...(isGitHubPagesStaticDemo
     ? {
         output: "export" as const,

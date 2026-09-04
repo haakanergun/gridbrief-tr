@@ -1,82 +1,92 @@
 # Devpost submission copy — GridBrief TR
 
-Use this as the English submission text. Replace bracketed URLs only after the public deployment, repository, and video are final.
+Use this as the English submission text. Replace the video placeholder only after the final public upload is ready.
 
 ## Project name
 
-GridBrief TR — an agent-native energy-market risk workspace
+GridBrief TR — agent-ready infrastructure for Türkiye's energy market
 
 ## Tagline
 
-Turn a Turkish electricity-market exposure into a source- and freshness-aware shift brief, with the human in control.
+Turn source-attributed EPİAŞ market data into a shared, reviewable workflow for trading, operations, planning, risk, and management teams.
 
 ## Inspiration
 
-Energy-market participants must reconcile price, system, supply, and demand information before a shift decision. Today that often means moving between operator pages, spreadsheets, and chat, then rebuilding the same context when a colleague asks “what changed?” We wanted to make the shared context—scope, evidence, freshness, scenario, and approval—the product itself.
+Energy-market participants must reconcile prices, system conditions, generation, consumption, and planning data before a shift decision. That work often spans operator pages, spreadsheets, and chat, forcing each team to rebuild the same context and making it difficult to answer a basic question: which source and timestamp support this decision?
 
-Türkiye’s EPİAŞ Transparency Platform makes rich market information available to authorized users, but availability and publication timing vary by report. That makes provenance and freshness as important as the number on a chart. GridBrief TR is designed around that constraint instead of hiding it.
+Türkiye's EPİAŞ Transparency Platform makes a broad electricity-market information surface available to authorized users, but reports have different scopes and publication schedules. GridBrief TR treats source, freshness, data level, and missing coverage as first-class parts of the product instead of hiding them.
 
-The surrounding information surface is real and substantial: EPİAŞ's official [2025 Annual Report](https://www.epias.com.tr/wp-content/uploads/2026/04/4-FAALIYET-RAPORU-2025.pdf) says the Transparency Platform served 28,006 registered users through 181 report screens and 253 web services. These are EPİAŞ platform figures, not GridBrief user claims.
+EPİAŞ's official [2025 Annual Report](https://www.epias.com.tr/wp-content/uploads/2026/04/4-FAALIYET-RAPORU-2025.pdf) reports 28,006 registered Transparency Platform users, 181 report screens, and 253 web services. Those are EPİAŞ platform figures, not GridBrief usage claims.
 
 ## What it does
 
-GridBrief TR is a decision-support workspace for a stated electricity-market exposure. The challenge walkthrough is a synthetic next-day reference scenario dated 4 September 2026: a participant is short 50 MWh between 17:00 and 22:00 (Türkiye time).
+GridBrief TR is an English/Turkish decision-support workspace for Türkiye's electricity market. It combines market overview, the Transparency 2.0 electricity catalogue, organization and power-plant discovery, and production/consumption planning in one light, source-aware interface.
 
-A browser agent uses the workspace's WebMCP tools to:
+A compatible browser agent can use eight page-defined WebMCP tools:
 
-1. set the delivery date and time window with `set_analysis_scope`;
-2. gather the in-scope market snapshot with `get_market_snapshot`;
-3. search the organization and power-plant catalogs with `find_market_entities`;
-4. compare production-plan and system-consumption evidence with `compare_plan_actual` at the levels in which EPİAŞ publishes it;
-5. run a transparent price-stress scenario for the stated position with `stress_test_position`; and
-6. draft a shift brief with `draft_shift_brief` that carries its evidence and mode labels.
+1. `set_analysis_scope` sets the delivery date and exclusive hour window in the visible workspace;
+2. `get_market_snapshot` retrieves the selected market snapshot with provenance and warnings;
+3. `find_market_entities` searches public organization and power-plant catalogues;
+4. `compare_plan_actual` loads planning and actual series at their published data levels;
+5. `stress_test_position` calculates a disclosed, local-only what-if sensitivity;
+6. `draft_shift_brief` renders an editable, source-attributed draft;
+7. `search_transparency_datasets` searches the electricity catalogue and synchronizes the visible selection; and
+8. `get_transparency_dataset` retrieves one allowlisted dataset by stable `datasetId` or official `menuId` and renders its rows, quality, source, and retrieval time.
 
-The participant then changes an assumption, sees the stress result and draft update, and explicitly approves the brief. GridBrief neither places a trade nor exposes any execution tool.
+The Devpost walkthrough shows an authorized production workspace on a completed historical day, with visible EPİAŞ provenance, retrieval time, coverage, and warnings. Separately, the native sample workflow proves eight-tool discovery and a successful `search_transparency_datasets` execution that updates the visible catalogue. During the recorded verification run, upstream EPİAŞ reads timed out and the harness failed closed; it did not relabel a synthetic fixture or structural catalogue fallback as a live observation.
 
-Each snapshot is marked with a source, retrieval/as-of time, and mode. In **Live EPİAŞ** mode, the gateway has documentation-mapped adapters for six reports: day-ahead PTF, balancing-market SMF, intraday weighted-average price, real-time consumption, real-time generation, and system direction. These adapters follow the official [EPİAŞ Electricity Service technical documentation](https://seffaflik.epias.com.tr/electricity-service/technical/tr/index.html). Partial upstream failures return null metrics and warnings; they are never filled with demo values. In **Synthetic demo** mode, deterministic demo data is visibly labelled `synthetic` and `not EPİAŞ`; it is never presented as live market data. Synthetic mode is used only when live mode is explicitly disabled.
-
-The public challenge deployment runs in synthetic demo mode so reviewers can reproduce the workflow without an EPİAŞ account. It does not retrieve, display, or redistribute EPİAŞ data. Its values are demonstration-only; the optional live gateway is intended only for a user operating under their own authorized EPİAŞ account and remains subject to EPİAŞ terms.
-
-Because the walkthrough's delivery window was future-dated when built, its synthetic observations demonstrate the human-agent interaction rather than claim future actuals. A production next-day view would anchor the delivery window on day-ahead PTF and appropriately licensed forecast/outage inputs, while delayed consumption, generation, SMF, and system direction would be shown only as current context. This temporal split is explicitly future work.
+The local what-if and shift-brief actions run only after a live market snapshot passes those checks. The user can then inspect and revise the visible assumptions and evidence. GridBrief exposes no market-order, trading-account, message-sending, or source-data mutation tool.
 
 ## How we used WebMCP
 
-WebMCP is not a chat box bolted onto a dashboard. It lets the browser agent use the same stateful workspace as the participant through six tools: `set_analysis_scope`, `get_market_snapshot`, `find_market_entities`, `compare_plan_actual`, `stress_test_position`, and `draft_shift_brief`. The agent can move from a structured delivery scope to a source-labelled entity or planning view, retrieve the visible snapshot with provenance, calculate a bounded stress test, and prepare a draft brief. Results are rendered back into the workspace for review.
+WebMCP is the interaction model, not a chat box attached to a dashboard. GridBrief registers structured tools on `document.modelContext`; a compatible browser discovers them with `getTools()` and executes a selected descriptor with JSON-stringified arguments. Each successful tool call also updates the same visible workspace the participant uses, so the agent and human share scope, results, warnings, and provenance.
 
-The data-level boundary is part of the tool contract: organization and UEVÇB filters apply to KGÜP, KUDÜP, and EAK production plans, while real-time generation, load plan, and consumption remain Türkiye-system observations in the planning comparison. Missing hours stay null, every aggregate reports its coverage, and a full-day deviation is withheld unless both compared series cover all 24 hours.
+The eight-tool surface supports two complementary paths. The decision path sets scope, retrieves a market snapshot, searches entities, compares planning evidence, calculates a local sensitivity, and drafts a shift note. The catalogue path searches the broader Transparency information architecture and retrieves a specific allowlisted dataset. This makes WebMCP useful to several business units without pretending that one generic prompt has access to every kind of private portfolio data.
 
-The visible UI and market API use an inclusive final hour: 17:00–22:59 is `startHour: 17, endHour: 22`. WebMCP uses an exclusive `endHour`, so the equivalent agent tool call is `startHour: 17, endHour: 23`. This explicit convention avoids an off-by-one delivery-hour error.
+The data-level boundary is part of the contract. Organization and UEVÇB filters apply only where EPİAŞ publishes those planning series. System generation and consumption remain system-level and are not relabelled as organization actuals. Missing hours remain null, aggregates report coverage, and a full-day deviation is withheld unless both series have complete comparable coverage.
 
-This improves the UX because the agent no longer has to infer a position from a paragraph or copy values across tabs. It receives structured fields and returns structured results that the user can inspect, amend, and approve in context. The tool surface is intentionally read-only with respect to markets: it supports analysis and communication, never ordering or execution.
+The visible UI uses an inclusive final hour, while the WebMCP scope contract uses an exclusive `endHour`. A tool call with `startHour: 17` and `endHour: 23` therefore represents the visible 17:00–22:59 window. Stating that convention in the schema prevents an off-by-one delivery error.
 
-Before this workflow, creating a defensible brief meant manually carrying the same scope, timestamps, and sources across several tools, then reconstructing why a number appeared. With GridBrief, the human and agent can jointly produce a reviewable record: the agent accelerates retrieval and synthesis while the human can correct assumptions and retains the approval gate.
+All eight tools are read-only with respect to EPİAŞ, market accounts, and trading venues. Some tools intentionally update local page state so the person and agent can work together; none can place an order, change upstream data, or publish a brief. Human review remains required, but the product does not depend on a separate approval-button ceremony.
+
+## Example cross-functional workflow
+
+- A **trading agent** retrieves price and imbalance context for the selected window.
+- An **operations agent** inspects generation evidence and publication coverage.
+- A **planning agent** compares KGÜP, KUDÜP, EAK, load-plan, and actual series only at valid data levels.
+- A **portfolio-risk agent** applies a transparent position sensitivity after the live price reference is verified.
+- A **management agent** assembles the sourced evidence, risks, and proposed checks into one draft decision record.
+
+These are role-specific uses of the same WebMCP contract and visible workspace. GridBrief does not claim that a deterministic demo runner is an LLM. The repository includes a CDP-based **sample agent workflow** that exercises the real browser interface and produces inspectable evidence for the demo.
 
 ## How we built it
 
-The application coordinates the market scope, separate explorer date, selected entity, planning layer, snapshot, stress result, and draft brief. Its WebMCP registration maps six safe actions—scope, snapshot, entity search, plan comparison, stress, and draft—to those visible states. This lets a compatible browser agent invoke the workflow and lets ordinary UI controls modify the exact same information without allowing market execution.
+The application is built with Next.js and React. Its server-only EPİAŞ gateway obtains and caches a short-lived ticket-granting token without returning or logging the credential. Live market and dataset responses carry provider, retrieval time, scope, quality, and warnings. Partial upstream market responses preserve nulls and warnings; live dataset errors fail closed and never receive fabricated replacement rows.
 
-The original four-tool workflow was verified in Chrome 152's experimental WebMCP implementation. We re-verified the current build in a compatible browser WebMCP runtime: it discovered all six registrations, and calls to `find_market_entities` and `compare_plan_actual` returned structured results while visibly opening the organization and planning workspaces without console errors.
+The page registers eight imperative WebMCP definitions for the lifetime of the workspace. Chrome 152's native implementation exposes them from `document.modelContext`. Our Node/CDP harness launches headed Chrome with WebMCP enabled, confirms all eight unique registrations, executes the descriptor returned by `getTools()`, and writes bounded sanitized evidence and screenshots. The harness accepts no username, password, token, cookie, or authorization-header argument.
 
-The data boundary is explicit. Live EPİAŞ requests use server-side configuration and a short-lived TGT authentication flow; credentials are never exposed to the browser. The server retains a TGT in memory for up to two hours with a five-minute renewal buffer. When live mode is disabled, the app uses a deterministic synthetic fixture and labels it in the UI and output. Enabling live mode with missing credentials fails closed. A live request with a partial source failure yields a warning and null value rather than synthetic substitution. Each snapshot includes provenance and freshness metadata so a delayed, unavailable, or synthetic source cannot masquerade as real-time information.
+Native discovery of all eight current registrations has been verified in Chrome 152. A run is called **live** only when its returned source identifies EPİAŞ and includes a valid `fetchedAt` or `retrievedAt`; the dataset path additionally requires at least one row. The harness retries an upstream read only once, then records a failed-closed result. Stress and brief tools are skipped unless a live market snapshot succeeds first.
 
-Stress results are simple disclosed sensitivities—exposure multiplied by a selected price move—not predictive models or trade recommendations. A final approval is a user action, not an agent call.
+The repository also retains an explicitly labelled deterministic synthetic mode for development when live mode is disabled. That mode is not the real-data evidence used in the Devpost walkthrough.
 
 ## Challenges we ran into
 
-The key challenge was making a useful agent workflow without compromising market-data integrity or human control. EPİAŞ data access requires authentication and reports have different publishing schedules, while a credential-free public demo must remain reproducible. We addressed this by separating live and synthetic modes, preserving source/freshness metadata, keeping secrets server-side, and limiting WebMCP to non-executing analysis tasks. Synthetic mode is selected only when live mode is explicitly disabled; enabling live mode with missing credentials fails closed, and a live-data failure never falls back to synthetic values.
+The hardest problem was not drawing another dashboard. It was preserving market-data integrity while making the page useful to agents. EPİAŞ authentication stays on the server; report semantics and data levels differ; publication gaps are normal; and upstream availability can change during a demo. We therefore separated structural catalogue availability from successful data retrieval, made provenance visible, preserved nulls, bounded every tool input, and made the recording depend on machine-checkable live evidence.
 
-The design challenge was resisting a broad “AI market terminal.” A single, complete shift-brief workflow made it possible to show why WebMCP matters: an agent completes repetitive context work while the participant can visibly inspect, change, and approve every material assumption.
+WebMCP itself is experimental. Chrome 152's native producer-side execution requires the descriptor returned by `getTools()` and JSON-stringified arguments. Our harness uses that real boundary rather than a polyfill, direct API shortcut, or mocked agent panel.
 
-## What’s next
+The product-design challenge was keeping the familiar Transparency information architecture while making a large catalogue approachable in English and Turkish. A shared shell, searchable catalogue, explicit source panel, and synchronized agent actions let specialist teams work from one record without losing the operator context they already know.
 
-Before any production use, we would complete a formal review of exact report semantics, account authorization, and permitted storage, display, and redistribution under EPİAŞ terms. We would then validate the documentation-mapped adapters with authorized market participants; separate future-window PTF, forecast, and outage evidence from delayed actuals used as current context; add organization-level audit retention and role controls; and expand data-quality checks and scenario libraries. We would preserve the no-execution boundary unless separately designed, governed, and authorized.
+## What's next
+
+Before production use, we would complete a formal review of report semantics, account authorization, and permitted storage, display, and redistribution under EPİAŞ terms. We would add organization-level audit retention, role controls, shared rate limiting, richer data-quality tests, and approved connections to internal portfolio systems. We would preserve the no-execution boundary unless a separate, governed product were designed and authorized.
 
 ## Links
 
-- Live application: https://haakanergun.github.io/gridbrief-tr/
+- Protected live application: https://gridbrief-tr.vercel.app/en
 - Source code: https://github.com/haakanergun/gridbrief-tr
 - Demo video (under three minutes): [YOUTUBE_URL]
 
 ## Attribution and disclosures
 
-GridBrief TR is an independent prototype and is not affiliated with or endorsed by EPİAŞ. The public demo does not retrieve, display, or redistribute EPİAŞ data. Any result labelled `synthetic` is fabricated, deterministic sample data—not an EPİAŞ quote, forecast, or trading signal. Optional live access requires the user's own authorized account and remains subject to EPİAŞ terms. The application provides decision support only; it does not trade or provide financial advice.
+GridBrief TR is an independent prototype and is not affiliated with or endorsed by EPİAŞ. Live access uses the operator's own authorized account and remains subject to EPİAŞ terms and applicable limits on use, storage, display, and redistribution. Any screen labelled synthetic is deterministic demonstration data, not an EPİAŞ observation, forecast, or trading signal. GridBrief provides decision support only; it does not trade or provide financial advice.

@@ -3,7 +3,6 @@
 import {
   Activity,
   ArrowDownRight,
-  ArrowRight,
   BarChart3,
   Braces,
   Building2,
@@ -12,7 +11,6 @@ import {
   ChevronRight,
   CircleAlert,
   Clock3,
-  Copy,
   Database,
   ExternalLink,
   Factory,
@@ -21,11 +19,17 @@ import {
   Network,
   RefreshCw,
   ShieldCheck,
-  Sparkles,
+  SlidersHorizontal,
+  X,
   Zap,
 } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { MarketChart } from "@/components/MarketChart";
+import {
+  DataCatalogWorkspace,
+  type CatalogRuntimeStatus,
+} from "@/components/DataCatalogWorkspace";
 import { TransparencyWorkspace, type TransparencyView } from "@/components/TransparencyWorkspace";
 import { useWebMcp } from "@/hooks/useWebMcp";
 import { createDemoSnapshot } from "@/lib/demo";
@@ -53,13 +57,24 @@ import {
   type ComparePlanActualInput,
   type DraftShiftBriefInput,
   type FindMarketEntitiesInput,
+  type GetTransparencyDatasetInput,
   type JsonValue,
   type MarketSnapshotInput,
+  type SearchTransparencyDatasetsInput,
   type StressTestPositionInput,
   type WebMcpActivityEvent,
   type WebMcpExecutionContext,
   type WebMcpToolName,
 } from "@/lib/webmcp";
+import type {
+  CatalogDatasetCapability,
+  DatasetDescriptor,
+  DatasetQueryInput,
+  DatasetQueryResponse,
+  UnsupportedCatalogDataset,
+} from "@/lib/transparency/dataset-types";
+import type { CatalogNode, ElectricityCatalogResponse } from "@/lib/transparency/types";
+import type { Locale } from "@/i18n/locale";
 
 type ActivityItem = {
   id: number;
@@ -68,42 +83,141 @@ type ActivityItem = {
   status: "done" | "active" | "waiting";
 };
 
-type AppView = "market" | TransparencyView;
+type AppView = "market" | "data-catalog" | TransparencyView;
 
-const APP_VIEWS: Array<{
+type DatasetCapability = CatalogDatasetCapability & { descriptor: DatasetDescriptor };
+
+type DatasetCapabilitiesPayload = {
+  capabilities: DatasetCapability[];
+  mappedCount: number;
+  catalogDatasetCount: number;
+  registryEndpointCount: number;
+  unsupported: UnsupportedCatalogDataset[];
+  source: string;
+  generatedAt: string;
+};
+
+const APP_VIEWS_TR: Array<{
   id: AppView;
   label: string;
+  shortLabel: string;
   kicker: string;
   description: string;
   icon: typeof LayoutDashboard;
 }> = [
-  { id: "market", label: "Piyasa özeti", kicker: "OPERASYON", description: "Fiyat, denge ve risk sinyalleri", icon: LayoutDashboard },
-  { id: "organizations", label: "Organizasyonlar", kicker: "VARLIK", description: "Katılımcı, GÖP ve UEVÇB", icon: Building2 },
-  { id: "plants", label: "Santraller", kicker: "VARLIK", description: "Üretim ve uzlaştırma kayıtları", icon: Factory },
-  { id: "planning", label: "Planlama", kicker: "PLAN / GERÇEK", description: "KGÜP, KUDÜP ve yük tahmini", icon: BarChart3 },
+  { id: "market", label: "Piyasa özeti", shortLabel: "Piyasa", kicker: "OPERASYON", description: "Fiyat, denge ve risk sinyalleri", icon: LayoutDashboard },
+  { id: "data-catalog", label: "Tüm EPİAŞ verileri", shortLabel: "Veriler", kicker: "CANLI KATALOG", description: "Şeffaflık 2.0 elektrik veri setlerinin tamamı", icon: Database },
+  { id: "organizations", label: "Organizasyonlar", shortLabel: "Kuruluş", kicker: "VARLIK", description: "Katılımcı, GÖP ve UEVÇB", icon: Building2 },
+  { id: "plants", label: "Santraller", shortLabel: "Santral", kicker: "VARLIK", description: "Üretim ve uzlaştırma kayıtları", icon: Factory },
+  { id: "planning", label: "Planlama", shortLabel: "Planlama", kicker: "PLAN / GERÇEK", description: "KGÜP, KUDÜP ve yük tahmini", icon: BarChart3 },
 ];
 
-const STARTING_ACTIVITY: ActivityItem[] = [
-  { id: 1, label: "Kapsam alındı", detail: "04 Eyl · 17:00–22:00 · 50 MWh kısa", status: "done" },
-  { id: 2, label: "Piyasa görünümü", detail: "Üç fiyat katmanı UTC+3’e hizalandı", status: "done" },
-  { id: 3, label: "Pozisyon stresi", detail: "Olumsuz makas senaryosu hesaplandı", status: "done" },
-  { id: 4, label: "Vardiya notu", detail: "Kaynaklı taslak hazırlandı", status: "done" },
-  { id: 5, label: "İnsan kontrolü", detail: "Operatör onayı bekleniyor", status: "waiting" },
+const APP_VIEWS_EN: typeof APP_VIEWS_TR = [
+  { id: "market", label: "Market overview", shortLabel: "Market", kicker: "OPERATIONS", description: "Price, balance and risk signals", icon: LayoutDashboard },
+  { id: "data-catalog", label: "All EPİAŞ data", shortLabel: "Data", kicker: "LIVE CATALOG", description: "The complete Transparency 2.0 electricity catalog", icon: Database },
+  { id: "organizations", label: "Organizations", shortLabel: "Organizations", kicker: "ASSETS", description: "Participants, DAM activity and UEVÇB units", icon: Building2 },
+  { id: "plants", label: "Power plants", shortLabel: "Plants", kicker: "ASSETS", description: "Generation and settlement records", icon: Factory },
+  { id: "planning", label: "Planning", shortLabel: "Planning", kicker: "PLAN / ACTUAL", description: "KGÜP, KUDÜP and load forecasts", icon: BarChart3 },
 ];
 
-const TOOL_ACTIVITY: Record<WebMcpToolName, Pick<ActivityItem, "id" | "label">> = {
-  set_analysis_scope: { id: 1, label: "Kapsam alındı" },
-  get_market_snapshot: { id: 2, label: "Piyasa görünümü" },
-  find_market_entities: { id: 6, label: "Varlık araması" },
-  compare_plan_actual: { id: 7, label: "Plan / gerçekleşen" },
-  stress_test_position: { id: 3, label: "Pozisyon stresi" },
-  draft_shift_brief: { id: 4, label: "Vardiya notu" },
-};
+function startingActivity(locale: Locale): ActivityItem[] {
+  return locale === "en" ? [
+    { id: 1, label: "Scope received", detail: "04 Sep · 17:00–22:00 · 50 MWh short", status: "done" },
+    { id: 2, label: "Market view", detail: "Three price layers aligned to UTC+3", status: "done" },
+    { id: 3, label: "Position stress", detail: "Adverse spread scenario calculated", status: "done" },
+    { id: 4, label: "Shift brief", detail: "Sourced draft is ready", status: "done" },
+    { id: 5, label: "Source status", detail: "Timestamps and warnings are visible", status: "done" },
+  ] : [
+    { id: 1, label: "Kapsam alındı", detail: "04 Eyl · 17:00–22:00 · 50 MWh kısa", status: "done" },
+    { id: 2, label: "Piyasa görünümü", detail: "Üç fiyat katmanı UTC+3’e hizalandı", status: "done" },
+    { id: 3, label: "Pozisyon stresi", detail: "Olumsuz makas senaryosu hesaplandı", status: "done" },
+    { id: 4, label: "Vardiya notu", detail: "Kaynaklı taslak hazırlandı", status: "done" },
+    { id: 5, label: "Kaynak durumu", detail: "Zaman damgaları ve uyarılar görünür", status: "done" },
+  ];
+}
+
+function toolActivity(locale: Locale): Record<WebMcpToolName, Pick<ActivityItem, "id" | "label">> {
+  return locale === "en" ? {
+    set_analysis_scope: { id: 1, label: "Scope received" },
+    get_market_snapshot: { id: 2, label: "Market view" },
+    find_market_entities: { id: 6, label: "Entity search" },
+    compare_plan_actual: { id: 7, label: "Plan / actual" },
+    stress_test_position: { id: 3, label: "Position stress" },
+    draft_shift_brief: { id: 4, label: "Shift brief" },
+    search_transparency_datasets: { id: 8, label: "Transparency data catalog" },
+    get_transparency_dataset: { id: 9, label: "Live Transparency data" },
+  } : {
+    set_analysis_scope: { id: 1, label: "Kapsam alındı" },
+    get_market_snapshot: { id: 2, label: "Piyasa görünümü" },
+    find_market_entities: { id: 6, label: "Varlık araması" },
+    compare_plan_actual: { id: 7, label: "Plan / gerçekleşen" },
+    stress_test_position: { id: 3, label: "Pozisyon stresi" },
+    draft_shift_brief: { id: 4, label: "Vardiya notu" },
+    search_transparency_datasets: { id: 8, label: "Şeffaflık veri kataloğu" },
+    get_transparency_dataset: { id: 9, label: "Canlı Şeffaflık verisi" },
+  };
+}
 
 const ALL_BRIEF_SECTIONS = ["market", "position", "risks", "actions"] as const;
 const STATIC_DEMO_MODE = process.env.NEXT_PUBLIC_STATIC_DEMO === "true";
 
+const PAGE_COPY = {
+  tr: {
+    product: "Türkiye Elektrik Piyasası", marketClock: "TR piyasa saati", navLabel: "Ana çalışma alanları",
+    workspace: "ÇALIŞMA ALANI", electricity: "Elektrik", backbone: "VERİ OMURGASI",
+    livePublic: "Oturumla erişilen kamu verisi", synthetic: "Sentetik gösterim verisi",
+    mcpReady: "WebMCP hazır", mcpWaiting: "WebMCP bekleniyor", browserTools: "tarayıcı aracı",
+    technicalSource: "Teknik kaynak", marketDay: "PİYASA GÜNÜ", refresh: "Veriyi yenile",
+    closeScope: "Analiz kapsamını kapat", scope: "ANALİZ KAPSAMI", resetScope: "Kapsamı sıfırla", close: "Kapat",
+    deliveryDay: "Teslimat günü", start: "Başlangıç", end: "Bitiş (dahil)", openPosition: "Açık pozisyon",
+    positionDirection: "Pozisyon yönü", short: "kısa", long: "uzun", aligning: "Kanıtlar hizalanıyor",
+    runRisk: "Risk notunu çalıştır", docs: "EPİAŞ teknik dokümantasyonu", deliveryRisk: "TESLİMAT RİSKİ",
+    headline: "Portföy dengede,", headlineAccent: "akşam riski yükseliyor.",
+    subtitle: "Seçili teslimat penceresini piyasa sinyalleri ve kaynak zamanlarıyla birlikte değerlendirin.",
+    editScope: "Kapsamı düzenle", planActual: "Plan / gerçekleşen", adverseImpact: "Gösterge niteliğinde olumsuz etki",
+    idmPeak: "GİP bağlam zirvesi", gatewayWarning: "Piyasa servisi uyarısı:", preserveView: "Son geçerli görünüm ekranda korunuyor.",
+    mcpWarning: "WebMCP kayıt uyarısı:", demoMode: "Gösterim modu:",
+    demoCopy: "kurgusal referans değerler iş akışını gösterir; EPİAŞ verisi veya gelecek gerçekleşeni değildir.",
+    sourceWarning: "Kaynak uyarısı:", averagePtf: "Pencere ort. PTF", intradayPeak: "Gün içi tepe",
+    deficitHours: "Sistemin açık olduğu saat", freshness: "Kanıt tazeliği", sourceTime: "Kaynak zamanı",
+    rankedEvidence: "SIRALANMIŞ KANIT", changedRisk: "Risk görünümünü ne değiştirdi?",
+    provenanceAttached: "Kaynak ve zaman damgası bağlı", dataCoverage: "veri kapsamı", decisionSupport: "KARAR DESTEK",
+    decisionSummary: "Karar özeti", shiftDraft: "VARDİYA NOTU / TASLAK", assessment: "Önerilen değerlendirme",
+    stressBasis: "Stres dayanağı", dataSource: "VERİ KAYNAĞI", localRun: "LOCAL RUN",
+  },
+  en: {
+    product: "Türkiye Electricity Market", marketClock: "TR market time", navLabel: "Primary workspaces",
+    workspace: "WORKSPACE", electricity: "Electricity", backbone: "DATA BACKBONE",
+    livePublic: "Session-authenticated public data", synthetic: "Synthetic demonstration data",
+    mcpReady: "WebMCP ready", mcpWaiting: "WebMCP waiting", browserTools: "browser tools",
+    technicalSource: "Technical source", marketDay: "MARKET DAY", refresh: "Refresh data",
+    closeScope: "Close analysis scope", scope: "ANALYSIS SCOPE", resetScope: "Reset scope", close: "Close",
+    deliveryDay: "Delivery day", start: "Start", end: "End (inclusive)", openPosition: "Open position",
+    positionDirection: "Position side", short: "short", long: "long", aligning: "Aligning evidence",
+    runRisk: "Run risk brief", docs: "EPİAŞ technical documentation", deliveryRisk: "DELIVERY RISK",
+    headline: "Portfolio is balanced,", headlineAccent: "evening risk is rising.",
+    subtitle: "Assess the selected delivery window with market signals and source timestamps.",
+    editScope: "Edit scope", planActual: "Plan / actual", adverseImpact: "Indicative adverse impact",
+    idmPeak: "IDM context peak", gatewayWarning: "Market service warning:", preserveView: "The last valid view remains on screen.",
+    mcpWarning: "WebMCP registration warning:", demoMode: "Demonstration mode:",
+    demoCopy: "fictional reference values demonstrate the workflow; they are not EPİAŞ data or future actuals.",
+    sourceWarning: "Source warning:", averagePtf: "Window avg. MCP", intradayPeak: "Intraday peak",
+    deficitHours: "System deficit hours", freshness: "Evidence freshness", sourceTime: "Source time",
+    rankedEvidence: "RANKED EVIDENCE", changedRisk: "What changed the risk view?",
+    provenanceAttached: "Source and timestamp attached", dataCoverage: "data coverage", decisionSupport: "DECISION SUPPORT",
+    decisionSummary: "Decision summary", shiftDraft: "SHIFT BRIEF / DRAFT", assessment: "Recommended assessment",
+    stressBasis: "Stress basis", dataSource: "DATA SOURCE", localRun: "LOCAL RUN",
+  },
+} as const;
+
 export default function Home() {
+  return <GridBriefApp locale="tr" />;
+}
+
+export function GridBriefApp({ locale }: { locale: Locale }) {
+  const en = locale === "en";
+  const copy = PAGE_COPY[locale];
+  const appViews = en ? APP_VIEWS_EN : APP_VIEWS_TR;
   const [activeView, setActiveView] = useState<AppView>("market");
   const [explorerDate, setExplorerDate] = useState(DEFAULT_SCOPE.date);
   const [refreshNonce, setRefreshNonce] = useState(0);
@@ -113,28 +227,42 @@ export default function Home() {
     query?: string;
     planningLayer?: "production" | "consumption";
   } | null>(null);
+  const [catalogIntent, setCatalogIntent] = useState<{
+    revision: number;
+    query?: string;
+    section?: string;
+    selectedMenuId?: number;
+    datasetQuery?: DatasetQueryInput | null;
+    datasetResult?: DatasetQueryResponse | null;
+  } | null>(null);
+  const [catalogRuntimeStatus, setCatalogRuntimeStatus] = useState<CatalogRuntimeStatus | null>(null);
   const [scope, setScope] = useState<AnalysisScope>(DEFAULT_SCOPE);
   const [snapshot, setSnapshot] = useState<MarketSnapshot>(() => createDemoSnapshot(DEFAULT_SCOPE));
   const [stress, setStress] = useState<StressResult>(() =>
     calculateStress(createDemoSnapshot(DEFAULT_SCOPE), DEFAULT_SCOPE.positionMwh, DEFAULT_SCOPE.side),
   );
   const [brief, setBrief] = useState<string[]>(() =>
-    draftBrief(
+    localizedBrief(
       createDemoSnapshot(DEFAULT_SCOPE),
       calculateStress(createDemoSnapshot(DEFAULT_SCOPE), DEFAULT_SCOPE.positionMwh, DEFAULT_SCOPE.side),
+      locale,
     ),
   );
   const [loading, setLoading] = useState(false);
-  const [approved, setApproved] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [activity, setActivity] = useState<ActivityItem[]>(STARTING_ACTIVITY);
-  const [traceLabel, setTraceLabel] = useState("DEMO TRACE");
+  const [scopeOpen, setScopeOpen] = useState(false);
+  const [activity, setActivity] = useState<ActivityItem[]>(() => startingActivity(locale));
+  const [traceLabel, setTraceLabel] = useState(en ? "DEMO TRACE" : "DEMO TRACE");
   const [gatewayError, setGatewayError] = useState<string | null>(null);
   const analysisRequestRef = useRef(0);
+  const catalogRequestRef = useRef(0);
   const latestStateRef = useRef({ scope, snapshot, stress });
   // Imperative WebMCP calls can run between React commits, so this mirror must be synchronous.
   // eslint-disable-next-line react-hooks/refs
   latestStateRef.current = { scope, snapshot, stress };
+
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   const selectedPoints = useMemo(
     () => snapshot.points.filter((point) => {
@@ -157,7 +285,37 @@ export default function Home() {
     [selectedPoints],
   );
   const shortHours = selectedPoints.filter((point) => point.systemDirection === "SHORT").length;
-  const currentView = APP_VIEWS.find((item) => item.id === activeView) ?? APP_VIEWS[0];
+  const currentView = appViews.find((item) => item.id === activeView) ?? appViews[0];
+  const catalogIsLive = catalogRuntimeStatus?.mode === "live";
+  const activeMode = activeView === "data-catalog"
+    ? catalogIsLive ? "live" : "synthetic"
+    : snapshot.mode;
+  const catalogModeLabel = catalogRuntimeStatus?.mode === "live"
+    ? en ? "EPİAŞ LIVE CATALOG" : "EPİAŞ CANLI KATALOG"
+    : catalogRuntimeStatus?.mode === "degraded-live"
+      ? en ? "EPİAŞ PARTIAL LIVE CATALOG" : "EPİAŞ KISMİ CANLI KATALOG"
+      : catalogRuntimeStatus?.mode === "stale-live"
+        ? en ? "EPİAŞ LAST LIVE CATALOG" : "EPİAŞ SON CANLI KATALOG"
+        : catalogRuntimeStatus?.mode === "auth-fallback"
+          ? en ? "EPİAŞ CATALOG FALLBACK" : "EPİAŞ KATALOG YEDEĞİ"
+          : catalogRuntimeStatus?.mode === "verified-snapshot"
+            ? en ? "VERIFIED CATALOG" : "DOĞRULANMIŞ KATALOG"
+            : catalogRuntimeStatus?.mode === "unavailable"
+              ? en ? "CATALOG UNAVAILABLE" : "KATALOG KULLANILAMIYOR"
+              : en ? "EPİAŞ CATALOG" : "EPİAŞ KATALOG";
+  const catalogModeDetail = catalogRuntimeStatus?.mode === "live"
+    ? en ? "Synced with the live menu tree" : "Canlı menü ağacıyla eşitlendi"
+    : catalogRuntimeStatus?.mode === "degraded-live"
+      ? en ? "Live catalog shown with a coverage warning" : "Canlı katalog eksik kapsam uyarısıyla gösteriliyor"
+      : catalogRuntimeStatus?.mode === "stale-live"
+        ? en ? "Showing the last successful live catalog" : "Son başarılı canlı katalog gösteriliyor"
+        : catalogRuntimeStatus?.mode === "auth-fallback"
+          ? en ? "Authentication failed; showing a verified fallback" : "Kimlik erişimi başarısız; doğrulanmış yedek gösteriliyor"
+          : catalogRuntimeStatus?.mode === "verified-snapshot"
+            ? en ? "Verified catalog snapshot" : "Doğrulanmış katalog anlık görüntüsü"
+            : catalogRuntimeStatus?.mode === "unavailable"
+              ? en ? "Catalog data could not be retrieved" : "Katalog verisi alınamadı"
+              : en ? "Verifying catalog status" : "Katalog durumu doğrulanıyor";
   const visibleAgentExplorer = agentExplorer
     && agentExplorer.result.scope.date === explorerDate
     && (
@@ -170,14 +328,13 @@ export default function Home() {
   const runAnalysis = useCallback(async (nextScope: AnalysisScope, signal?: AbortSignal) => {
     const requestId = ++analysisRequestRef.current;
     setLoading(true);
-    setApproved(false);
     setGatewayError(null);
     setActivity([
-      { id: 1, label: "Kapsam alındı", detail: `${nextScope.date} · ${nextScope.startHour}:00–${nextScope.endHour}:00 · ${nextScope.positionMwh} MWh ${nextScope.side === "short" ? "kısa" : "uzun"}`, status: "done" },
-      { id: 2, label: "Piyasa görünümü", detail: "Saatlik piyasa serileri hizalanıyor", status: "active" },
-      { id: 3, label: "Pozisyon stresi", detail: "Piyasa kanıtı bekleniyor", status: "waiting" },
-      { id: 4, label: "Vardiya notu", detail: "Stres sonucu bekleniyor", status: "waiting" },
-      { id: 5, label: "İnsan kontrolü", detail: "Operatör onayı bekleniyor", status: "waiting" },
+      { id: 1, label: en ? "Scope received" : "Kapsam alındı", detail: `${nextScope.date} · ${nextScope.startHour}:00–${nextScope.endHour}:00 · ${nextScope.positionMwh} MWh ${nextScope.side === "short" ? copy.short : copy.long}`, status: "done" },
+      { id: 2, label: en ? "Market view" : "Piyasa görünümü", detail: en ? "Aligning hourly market series" : "Saatlik piyasa serileri hizalanıyor", status: "active" },
+      { id: 3, label: en ? "Position stress" : "Pozisyon stresi", detail: en ? "Waiting for market evidence" : "Piyasa kanıtı bekleniyor", status: "waiting" },
+      { id: 4, label: en ? "Shift brief" : "Vardiya notu", detail: en ? "Waiting for the stress result" : "Stres sonucu bekleniyor", status: "waiting" },
+      { id: 5, label: en ? "Source status" : "Kaynak durumu", detail: en ? "Checking data quality" : "Veri kalitesi denetleniyor", status: "active" },
     ]);
 
     try {
@@ -203,13 +360,13 @@ export default function Home() {
         setScope(nextScope);
         setSnapshot(nextSnapshot);
         setStress(nextStress);
-        setBrief(draftBrief(nextSnapshot, nextStress));
+        setBrief(localizedBrief(nextSnapshot, nextStress, locale));
         setActivity([
-          { id: 1, label: "Kapsam alındı", detail: `${nextScope.date} · ${nextScope.startHour}:00–${nextScope.endHour}:00 · ${nextScope.positionMwh} MWh ${nextScope.side === "short" ? "kısa" : "uzun"}`, status: "done" },
-          { id: 2, label: "Piyasa görünümü", detail: `${nextSnapshot.points.length} saatlik gözlem · ${nextSnapshot.mode === "live" ? "canlı" : "sentetik"}`, status: "done" },
-          { id: 3, label: "Pozisyon stresi", detail: `${formatMaybeTry(nextStress.estimatedExposureTry)} gösterge niteliğinde`, status: "done" },
-          { id: 4, label: "Vardiya notu", detail: "Taslak güncel kanıtlarla yenilendi", status: "done" },
-          { id: 5, label: "İnsan kontrolü", detail: "Operatör onayı bekleniyor", status: "waiting" },
+          { id: 1, label: en ? "Scope received" : "Kapsam alındı", detail: `${nextScope.date} · ${nextScope.startHour}:00–${nextScope.endHour}:00 · ${nextScope.positionMwh} MWh ${nextScope.side === "short" ? copy.short : copy.long}`, status: "done" },
+          { id: 2, label: en ? "Market view" : "Piyasa görünümü", detail: en ? `${nextSnapshot.points.length} hourly observations · ${nextSnapshot.mode}` : `${nextSnapshot.points.length} saatlik gözlem · ${nextSnapshot.mode === "live" ? "canlı" : "sentetik"}`, status: "done" },
+          { id: 3, label: en ? "Position stress" : "Pozisyon stresi", detail: en ? `${formatMaybeTry(nextStress.estimatedExposureTry)} indicative` : `${formatMaybeTry(nextStress.estimatedExposureTry)} gösterge niteliğinde`, status: "done" },
+          { id: 4, label: en ? "Shift brief" : "Vardiya notu", detail: en ? "Draft refreshed with current evidence" : "Taslak güncel kanıtlarla yenilendi", status: "done" },
+          { id: 5, label: en ? "Source status" : "Kaynak durumu", detail: en ? "Timestamps and warnings are current" : "Zaman damgaları ve uyarılar güncel", status: "done" },
         ]);
       }
       return { snapshot: nextSnapshot, stress: nextStress };
@@ -220,18 +377,18 @@ export default function Home() {
       if (requestId === analysisRequestRef.current) {
         setGatewayError(message);
         setActivity([
-          { id: 1, label: "Kapsam alındı", detail: `${nextScope.date} · ${nextScope.startHour}:00–${nextScope.endHour}:00 · ${nextScope.positionMwh} MWh ${nextScope.side === "short" ? "kısa" : "uzun"}`, status: "done" },
-          { id: 2, label: "Piyasa görünümü", detail: "Servis yanıtlamadı; son geçerli görünüm korundu", status: "waiting" },
-          { id: 3, label: "Pozisyon stresi", detail: "Eksik kanıtla yeniden hesaplanmadı", status: "waiting" },
-          { id: 4, label: "Vardiya notu", detail: "Mevcut taslak korundu", status: "waiting" },
-          { id: 5, label: "İnsan kontrolü", detail: "Onaydan önce kaynak uyarısını giderin", status: "waiting" },
+          { id: 1, label: en ? "Scope received" : "Kapsam alındı", detail: `${nextScope.date} · ${nextScope.startHour}:00–${nextScope.endHour}:00 · ${nextScope.positionMwh} MWh ${nextScope.side === "short" ? copy.short : copy.long}`, status: "done" },
+          { id: 2, label: en ? "Market view" : "Piyasa görünümü", detail: en ? "Service did not respond; last valid view retained" : "Servis yanıtlamadı; son geçerli görünüm korundu", status: "waiting" },
+          { id: 3, label: en ? "Position stress" : "Pozisyon stresi", detail: en ? "Not recalculated with incomplete evidence" : "Eksik kanıtla yeniden hesaplanmadı", status: "waiting" },
+          { id: 4, label: en ? "Shift brief" : "Vardiya notu", detail: en ? "Existing draft retained" : "Mevcut taslak korundu", status: "waiting" },
+          { id: 5, label: en ? "Source status" : "Kaynak durumu", detail: en ? "Live source temporarily unavailable" : "Canlı kaynak geçici olarak erişilemez", status: "waiting" },
         ]);
       }
       throw error instanceof Error ? error : new Error(message);
     } finally {
       if (requestId === analysisRequestRef.current) setLoading(false);
     }
-  }, []);
+  }, [copy.long, copy.short, en, locale]);
 
   const requestExplorer = useCallback(async (request: ExplorerRequest, signal?: AbortSignal): Promise<ExplorerResponse> => {
     signal?.throwIfAborted();
@@ -278,15 +435,15 @@ export default function Home() {
 
   const handleWebMcpActivity = useCallback((event: WebMcpActivityEvent) => {
     setTraceLabel("WEBMCP TRACE");
-    const tool = TOOL_ACTIVITY[event.toolName];
+    const tool = toolActivity(locale)[event.toolName];
     const status: ActivityItem["status"] = event.phase === "started" ? "active" : event.phase === "succeeded" ? "done" : "waiting";
     const detail = event.phase === "started"
-      ? "Tarayıcı ajanı bu aracı çağırdı"
+      ? en ? "A browser agent called this tool" : "Tarayıcı ajanı bu aracı çağırdı"
       : event.phase === "succeeded"
-        ? `${formatTimestamp(event.occurredAt)} itibarıyla tamamlandı`
+        ? en ? `Completed at ${formatTimestamp(event.occurredAt, locale)}` : `${formatTimestamp(event.occurredAt, locale)} itibarıyla tamamlandı`
         : event.phase === "cancelled"
-          ? "Ajan tarafından iptal edildi"
-          : event.error?.message ?? "Araç çalıştırılamadı";
+          ? en ? "Cancelled by the agent" : "Ajan tarafından iptal edildi"
+          : event.error?.message ?? (en ? "Tool execution failed" : "Araç çalıştırılamadı");
 
     setActivity((items) => {
       const updated = items.map((item) => item.id === tool.id ? { ...item, label: tool.label, detail, status } : item);
@@ -294,7 +451,7 @@ export default function Home() {
         ? updated
         : [...updated, { ...tool, detail, status }];
     });
-  }, []);
+  }, [en, locale]);
 
   const setAnalysisScopeTool = useCallback((input: AnalysisScopeInput, context: WebMcpExecutionContext): JsonValue => {
     context.signal.throwIfAborted();
@@ -302,7 +459,6 @@ export default function Home() {
     const nextScope = fromExclusiveToolWindow(input, latest.scope);
     latestStateRef.current = { ...latest, scope: nextScope };
     setScope(nextScope);
-    setApproved(false);
 
     return toJsonValue({
       status: "scope_updated",
@@ -525,7 +681,6 @@ export default function Home() {
     const nextScope = { ...latest.scope, positionMwh: input.volumeMwh, side: input.direction };
     latestStateRef.current = { ...latest, scope: nextScope };
     setScope(nextScope);
-    setApproved(false);
 
     if (!isFiniteNumber(referencePrice)) {
       return toJsonValue({
@@ -573,7 +728,6 @@ export default function Home() {
     const sectionText = buildBriefSections({ language, audience, sections, notes: input.notes }, latest.snapshot, latest.stress);
     const nextBrief = sectionText.map((section) => section.text);
     setBrief(nextBrief);
-    setApproved(false);
 
     return toJsonValue({
       status: "draft_displayed",
@@ -586,6 +740,179 @@ export default function Home() {
     });
   }, []);
 
+  const searchTransparencyDatasetsTool = useCallback(async (
+    input: SearchTransparencyDatasetsInput,
+    context: WebMcpExecutionContext,
+  ): Promise<JsonValue> => {
+    context.signal.throwIfAborted();
+    const requestId = ++catalogRequestRef.current;
+    const [catalogResponse, capabilityResponse] = await Promise.all([
+      fetch("/api/catalog", {
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+        signal: context.signal,
+      }),
+      fetch("/api/dataset", {
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+        signal: context.signal,
+      }),
+    ]);
+    if (!catalogResponse.ok) throw new Error(await readGatewayError(catalogResponse));
+    if (!capabilityResponse.ok) throw new Error(await readGatewayError(capabilityResponse));
+
+    const catalog = await catalogResponse.json() as ElectricityCatalogResponse;
+    const capabilityPayload = await capabilityResponse.json() as DatasetCapabilitiesPayload;
+    const capabilityByMenuId = new Map(
+      capabilityPayload.capabilities.map((capability) => [capability.menuId, capability]),
+    );
+    const entries = flattenCatalogForSearch(catalog.root.children);
+    const section = input.section ?? "all";
+    const needle = normalizeCatalogSearch(input.query?.trim() ?? "");
+    const matching = entries.filter((entry) => {
+      if (!catalogEntryMatchesSection(entry, section)) return false;
+      if (!needle) return true;
+      return normalizeCatalogSearch(`${entry.label} ${entry.labelEn ?? ""} ${entry.trail.join(" ")}`).includes(needle);
+    });
+    const limit = Math.min(25, Math.max(1, input.limit ?? 10));
+    const visibleIntent = catalogVisibleIntent(input);
+    const displayed = requestId === catalogRequestRef.current;
+    if (displayed) {
+      setCatalogIntent({ revision: requestId, ...visibleIntent });
+      setCatalogRuntimeStatus({
+        mode: catalog.mode ?? "live",
+        warnings: catalog.warnings ?? [],
+      });
+      setActiveView("data-catalog");
+    }
+
+    return toJsonValue({
+      status: displayed ? "catalog_displayed" : "catalog_ready_not_displayed",
+      query: input.query?.trim() || null,
+      section,
+      totalMatches: matching.length,
+      results: matching.slice(0, limit).map((entry) => ({
+        menuId: entry.id,
+        datasetId: capabilityByMenuId.get(entry.id)?.datasetId ?? null,
+        liveAvailable: capabilityByMenuId.has(entry.id),
+        descriptor: capabilityByMenuId.get(entry.id)?.descriptor ?? null,
+        name: entry.label,
+        nameEn: entry.labelEn ?? null,
+        section: entry.section,
+        path: entry.trail,
+      })),
+      source: {
+        provider: catalog.source,
+        fetchedAt: catalog.fetchedAt,
+        mode: catalog.mode ?? "live",
+        scope: "Official EPİAŞ Transparency 2.0 electricity menu tree",
+      },
+      coverage: {
+        verifiedJsonAdapters: capabilityPayload.mappedCount,
+        catalogItems: capabilityPayload.catalogDatasetCount,
+      },
+      warnings: [
+        ...(catalog.warnings ?? []),
+        ...(matching.length > limit
+          ? [`${matching.length - limit} additional catalog matches remain visible in the page.`]
+          : []),
+        ...matching.slice(0, limit).flatMap((entry) => {
+          const unsupported = capabilityPayload.unsupported.find((item) => item.menuId === entry.id);
+          return unsupported ? [`${entry.label}: ${unsupported.reason}`] : [];
+        }),
+      ],
+      safety: "Read-only catalog discovery. No EPİAŞ data or market position was modified.",
+    });
+  }, []);
+
+  const getTransparencyDatasetTool = useCallback(async (
+    input: GetTransparencyDatasetInput,
+    context: WebMcpExecutionContext,
+  ): Promise<JsonValue> => {
+    context.signal.throwIfAborted();
+    const requestId = ++catalogRequestRef.current;
+    const capabilityResponse = await fetch("/api/dataset", {
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+      signal: context.signal,
+    });
+    if (!capabilityResponse.ok) throw new Error(await readGatewayError(capabilityResponse));
+    const capabilityPayload = await capabilityResponse.json() as DatasetCapabilitiesPayload;
+    const datasetId = input.datasetId?.trim();
+    const capability = datasetId
+      ? capabilityPayload.capabilities.find((item) => item.datasetId === datasetId)
+      : capabilityPayload.capabilities.find((item) => item.menuId === input.menuId);
+    if (!capability) {
+      throw new Error("Requested dataset is not an approved live EPİAŞ catalog capability.");
+    }
+    rejectUnsupportedDatasetToolDates(input, capability.descriptor);
+
+    const filters: Record<string, unknown> = {};
+    const allowedFilters = new Map(
+      capability.descriptor.availableFilters.map((filter) => [filter.key, filter]),
+    );
+    for (const [key, value] of Object.entries(input.filters ?? {})) {
+      if (!allowedFilters.has(key)) {
+        throw new Error(`filters.${key} is not available for ${capability.datasetId}.`);
+      }
+      filters[key] = value;
+    }
+    for (const filter of capability.descriptor.availableFilters) {
+      if (!filter.required || filters[filter.key] !== undefined) continue;
+      if (filter.key === "region") filters.region = "TR1";
+      else if (filter.key === "year") {
+        filters.year = filter.type === "number" || filter.type === "integer"
+          ? Number(explorerDate.slice(0, 4))
+          : explorerDate.slice(0, 4);
+      } else {
+        throw new Error(`filters.${filter.key} is required for ${capability.datasetId}.`);
+      }
+    }
+
+    const query: DatasetQueryInput = {
+      datasetId: capability.datasetId,
+      filters,
+      page: validateDatasetToolPage(input.page),
+    };
+    for (const field of capability.descriptor.dateFields) {
+      if (field.key === "startDate") query.startDate = input.startDate ?? explorerDate;
+      if (field.key === "endDate") query.endDate = input.endDate ?? input.startDate ?? explorerDate;
+      if (field.key === "date") query.date = input.date ?? explorerDate;
+      if (field.key === "period") query.period = input.period ?? explorerDate;
+    }
+    validateDatasetToolDates(query);
+
+    const response = await fetch("/api/dataset", {
+      method: "POST",
+      cache: "no-store",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify(query),
+      signal: context.signal,
+    });
+    if (!response.ok) throw new Error(await readGatewayError(response));
+    const result = await response.json() as DatasetQueryResponse;
+    const displayed = requestId === catalogRequestRef.current;
+    if (displayed) {
+      setCatalogIntent({
+        revision: requestId,
+        query: capability.label,
+        section: "all",
+        selectedMenuId: capability.menuId,
+        datasetQuery: query,
+        datasetResult: result,
+      });
+      setActiveView("data-catalog");
+    }
+
+    return toJsonValue({
+      status: displayed ? "dataset_displayed" : "dataset_ready_not_displayed",
+      menuId: capability.menuId,
+      datasetId: capability.datasetId,
+      result,
+      safety: "Read-only EPİAŞ Transparency query. No market order or source data was modified.",
+    });
+  }, [explorerDate]);
+
   const webMcp = useWebMcp({
     setAnalysisScope: setAnalysisScopeTool,
     getMarketSnapshot: getMarketSnapshotTool,
@@ -593,30 +920,21 @@ export default function Home() {
     comparePlanActual: comparePlanActualTool,
     stressTestPosition: stressTestPositionTool,
     draftShiftBrief: draftShiftBriefTool,
+    searchTransparencyDatasets: searchTransparencyDatasetsTool,
+    getTransparencyDataset: getTransparencyDatasetTool,
     onActivity: handleWebMcpActivity,
   });
 
   function submitScope(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setTraceLabel("LOCAL RUN");
+    setScopeOpen(false);
+    setTraceLabel(copy.localRun);
     void runAnalysis(scope).catch(() => undefined);
-  }
-
-  async function copyAgentPrompt() {
-    const prompt = `Bu sayfanın WebMCP araçlarını kullanarak ${scope.date} günü ${scope.startHour}:00–${scope.endHour}:59 teslimat saatlerindeki ${scope.positionMwh} MWh ${scope.side === "short" ? "kısa" : "uzun"} pozisyonu incele (araç çağrısında exclusive endHour ${scope.endHour + 1} kullan). Kanıtları göster, pozisyonu %20 yukarı fiyat şokuyla stres testine sok ve operasyon ekibi için Türkçe vardiya notu hazırla. İşlem yapma veya emir önerme.`;
-    await navigator.clipboard.writeText(prompt);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
-  }
-
-  function approveBrief() {
-    setApproved(true);
-    setActivity((items) => items.map((item) => item.id === 5 ? { ...item, detail: "Yerel olarak incelendi ve onaylandı", status: "done" } : item));
   }
 
   function refreshActiveView() {
     if (activeView === "market") {
-      setTraceLabel("LOCAL RUN");
+      setTraceLabel(copy.localRun);
       void runAnalysis(scope).catch(() => undefined);
       return;
     }
@@ -629,18 +947,25 @@ export default function Home() {
       <header className="topbar">
         <a className="brand" href="#workspace" aria-label="GridBrief TR home">
           <span className="brand-mark"><Zap size={15} strokeWidth={2.8} /></span>
-          <span>GRIDBRIEF <em>TR</em><small>ŞEFFAFLIK OS</small></span>
+          <span>GRIDBRIEF <em>TR</em><small>{en ? "TRANSPARENCY OS" : "ŞEFFAFLIK OS"}</small></span>
         </a>
         <div className="topbar-product">
           <Network size={15} />
-          <span>Türkiye Elektrik Piyasası</span>
+          <span>{copy.product}</span>
           <ChevronRight size={13} />
           <b>{currentView.label}</b>
         </div>
         <div className="topbar-context">
-          <span className="market-clock"><Clock3 size={14} /> TR piyasa saati <b>UTC+3</b></span>
-          <span className={`mode-indicator ${snapshot.mode}`}>
-            <i /> {snapshot.mode === "live" ? "EPİAŞ LIVE" : "SYNTHETIC REPLAY"}
+          <span className="market-clock"><Clock3 size={14} /> {copy.marketClock} <b>UTC+3</b></span>
+          <span className="locale-switcher" aria-label={en ? "Language" : "Dil"}>
+            <Link href="/tr" aria-current={!en ? "page" : undefined}>TR</Link>
+            <Link href="/en" aria-current={en ? "page" : undefined}>EN</Link>
+          </span>
+          <span
+            className={`mode-indicator ${activeMode}`}
+            title={activeView === "data-catalog" ? catalogRuntimeStatus?.warnings[0] : undefined}
+          >
+            <i /> {activeView === "data-catalog" ? catalogModeLabel : activeMode === "live" ? "EPİAŞ LIVE" : "SYNTHETIC REPLAY"}
           </span>
           <span className={`mcp-indicator ${webMcp.registered ? "supported" : ""}`} title={webMcp.error ?? undefined}>
             <Braces size={14} /> WebMCP {webMcp.registered ? "ready" : webMcp.status}
@@ -649,52 +974,55 @@ export default function Home() {
       </header>
 
       <div className="platform-frame">
-        <aside className="product-nav" aria-label="Ana çalışma alanları">
+        <aside className="product-nav" aria-label={copy.navLabel}>
           <div className="nav-context">
             <span className="nav-context-mark"><Zap size={16} /></span>
-            <div><small>ÇALIŞMA ALANI</small><b>Elektrik</b></div>
+            <div><small>{copy.workspace}</small><b>{copy.electricity}</b></div>
           </div>
           <nav>
-            {APP_VIEWS.map((item) => {
+            {appViews.map((item) => {
               const Icon = item.icon;
               return (
                 <button
                   type="button"
                   key={item.id}
                   className={activeView === item.id ? "active" : ""}
-                  onClick={() => setActiveView(item.id)}
+                  onClick={() => {
+                    if (item.id === "data-catalog") setCatalogIntent(null);
+                    setActiveView(item.id);
+                  }}
                   aria-current={activeView === item.id ? "page" : undefined}
                   aria-label={item.label}
                   title={item.label}
                 >
                   <span><Icon size={17} /></span>
-                  <span><b>{item.label}</b><small>{item.description}</small></span>
+                  <span><b><span className="nav-label-long">{item.label}</span><span className="nav-label-short">{item.shortLabel}</span></b><small>{item.description}</small></span>
                   {activeView === item.id && <i />}
                 </button>
               );
             })}
           </nav>
           <div className="nav-system-card">
-            <span className="eyebrow">VERİ OMURGASI</span>
-            <div><i className={snapshot.mode === "live" ? "is-live" : ""} /><span><b>EPİAŞ Şeffaflık 2.0</b><small>{snapshot.mode === "live" ? "Oturumla erişilen kamu verisi" : "Sentetik gösterim verisi"}</small></span></div>
-            <div><Braces size={14} /><span><b>{webMcp.registered ? "WebMCP hazır" : "WebMCP bekleniyor"}</b><small>{webMcp.tools.length} tarayıcı aracı</small></span></div>
+            <span className="eyebrow">{copy.backbone}</span>
+            <div><i className={activeMode === "live" ? "is-live" : ""} /><span><b>EPİAŞ Transparency 2.0</b><small>{activeView === "data-catalog" ? catalogModeDetail : activeMode === "live" ? copy.livePublic : copy.synthetic}</small></span></div>
+            <div><Braces size={14} /><span><b>{webMcp.registered ? copy.mcpReady : copy.mcpWaiting}</b><small>{webMcp.tools.length} {copy.browserTools}</small></span></div>
           </div>
           <a className="nav-doc-link" href="https://seffaflik.epias.com.tr/electricity-service/technical/tr/index.html" target="_blank" rel="noreferrer">
-            <Database size={14} /> Teknik kaynak <ExternalLink size={12} />
+            <Database size={14} /> {copy.technicalSource} <ExternalLink size={12} />
           </a>
         </aside>
 
         <section className="view-root" id="workspace">
-          <header className="view-header">
+          <header className={`view-header ${activeView === "market" ? "is-market" : ""}`}>
             <div>
-              <span className="view-kicker">{currentView.kicker} / ELEKTRİK</span>
+              <span className="view-kicker">{currentView.kicker} / {en ? "ELECTRICITY" : "ELEKTRİK"}</span>
               <h1>{currentView.label}</h1>
               <p>{currentView.description}</p>
             </div>
             <div className="global-controls">
               <label className="global-date-control">
                 <CalendarDays size={15} />
-                <span><small>PİYASA GÜNÜ</small><input
+                <span><small>{copy.marketDay}</small><input
                   type="date"
                   value={activeView === "market" ? scope.date : explorerDate}
                   onChange={(event) => {
@@ -707,47 +1035,53 @@ export default function Home() {
                   }}
                 /></span>
               </label>
-              <button className="refresh-view-button" type="button" onClick={refreshActiveView} disabled={loading && activeView === "market"}>
+              <button className="refresh-view-button" type="button" aria-label={copy.refresh} onClick={refreshActiveView} disabled={loading && activeView === "market"}>
                 <RefreshCw className={loading && activeView === "market" ? "spin" : ""} size={15} />
-                <span>Veriyi yenile</span>
+                <span>{copy.refresh}</span>
               </button>
             </div>
           </header>
 
           {activeView === "market" ? (
           <section className="workspace market-workspace">
-        <aside className="scope-rail">
+        {scopeOpen && <button className="scope-backdrop" type="button" aria-label={copy.closeScope} onClick={() => setScopeOpen(false)} />}
+        <aside className={`scope-rail ${scopeOpen ? "is-open" : ""}`} aria-hidden={!scopeOpen}>
           <div className="rail-heading">
-            <span className="eyebrow">ANALİZ KAPSAMI</span>
-            <button className="icon-button" type="button" title="Kapsamı sıfırla" onClick={() => {
-              setTraceLabel("LOCAL RUN");
-              void runAnalysis(DEFAULT_SCOPE).catch(() => undefined);
-            }}>
-              <RefreshCw size={15} />
-            </button>
+            <span className="eyebrow">{copy.scope}</span>
+            <div className="scope-heading-actions">
+              <button className="icon-button" type="button" title={copy.resetScope} onClick={() => {
+                setTraceLabel(copy.localRun);
+                void runAnalysis(DEFAULT_SCOPE).catch(() => undefined);
+              }}>
+                <RefreshCw size={15} />
+              </button>
+              <button className="icon-button" type="button" title={copy.close} onClick={() => setScopeOpen(false)}>
+                <X size={16} />
+              </button>
+            </div>
           </div>
 
           <form className="scope-form" onSubmit={submitScope}>
             <label>
-              Teslimat günü
+              {copy.deliveryDay}
               <input type="date" value={scope.date} onChange={(event) => setScope({ ...scope, date: event.target.value })} />
             </label>
             <div className="form-split">
               <label>
-                Başlangıç
+                {copy.start}
                 <select value={scope.startHour} onChange={(event) => setScope({ ...scope, startHour: Number(event.target.value) })}>
                   {Array.from({ length: 24 }, (_, hour) => <option key={hour} value={hour}>{String(hour).padStart(2, "0")}:00</option>)}
                 </select>
               </label>
               <label>
-                Bitiş (dahil)
+                {copy.end}
                 <select value={scope.endHour} onChange={(event) => setScope({ ...scope, endHour: Number(event.target.value) })}>
                   {Array.from({ length: 24 }, (_, hour) => <option key={hour} value={hour}>{String(hour).padStart(2, "0")}:00</option>)}
                 </select>
               </label>
             </div>
             <label>
-              Açık pozisyon
+              {copy.openPosition}
               <div className="unit-input">
                 <input
                   type="number"
@@ -760,7 +1094,7 @@ export default function Home() {
               </div>
             </label>
             <fieldset>
-              <legend>Pozisyon yönü</legend>
+              <legend>{copy.positionDirection}</legend>
               <div className="side-toggle">
                 {(["short", "long"] as PositionSide[]).map((side) => (
                   <button
@@ -769,62 +1103,62 @@ export default function Home() {
                     className={scope.side === side ? "active" : ""}
                     onClick={() => setScope({ ...scope, side })}
                   >
-                    {side === "short" ? "kısa" : "uzun"}
+                    {side === "short" ? copy.short : copy.long}
                   </button>
                 ))}
               </div>
             </fieldset>
             <button className="primary-button" type="submit" disabled={loading}>
-              {loading ? <RefreshCw className="spin" size={16} /> : <Sparkles size={16} />}
-              {loading ? "Kanıtlar hizalanıyor" : "Risk notunu çalıştır"}
+              {loading ? <RefreshCw className="spin" size={16} /> : <Check size={16} />}
+              {loading ? copy.aligning : copy.runRisk}
             </button>
           </form>
 
-          <div className="agent-prompt">
-            <span className="eyebrow">AJANINIZLA DENEYİN</span>
-            <p>Tarayıcı ajanından bu teslimat penceresini incelemesini isteyin.</p>
-            <button type="button" onClick={() => void copyAgentPrompt()}>
-              {copied ? <Check size={14} /> : <Copy size={14} />}
-              {copied ? "İstem kopyalandı" : "Ajan istemini kopyala"}
-            </button>
-          </div>
-
           <a className="source-link" href="https://seffaflik.epias.com.tr/electricity-service/technical/tr/index.html" target="_blank" rel="noreferrer">
-            EPİAŞ teknik dokümantasyonu <ExternalLink size={13} />
+            {copy.docs} <ExternalLink size={13} />
           </a>
         </aside>
 
         <section className="market-stage">
           <div className="stage-heading">
             <div>
-              <span className="eyebrow">TESLİMAT RİSKİ · {scope.date}</span>
-              <h1>Akşam pozisyonu<br /><span>baskı altında.</span></h1>
+              <span className="eyebrow">{copy.deliveryRisk} · {scope.date}</span>
+              <h1>{copy.headline}<br /><span>{copy.headlineAccent}</span></h1>
+              <p className="stage-subtitle">{copy.subtitle}</p>
+            </div>
+            <div className="stage-actions">
+              <button className="stage-primary-action" type="button" onClick={() => setScopeOpen(true)}>
+                <SlidersHorizontal size={17} /> {copy.editScope}
+              </button>
+              <button className="stage-secondary-action" type="button" onClick={() => setActiveView("planning")}>
+                <BarChart3 size={17} /> {copy.planActual}
+              </button>
             </div>
             <div className="headline-metric">
-              <span>Gösterge niteliğinde olumsuz etki</span>
+              <span>{copy.adverseImpact}</span>
               <strong>{formatMaybeTry(stress.estimatedExposureTry)}</strong>
-              <small><ArrowDownRight size={14} /> GİP bağlam zirvesi {stress.contextPeakHour}</small>
+              <small><ArrowDownRight size={14} /> {copy.idmPeak} {stress.contextPeakHour}</small>
             </div>
           </div>
 
           {gatewayError && (
             <div className="gateway-error" role="alert">
               <CircleAlert size={15} />
-              <span><b>Piyasa servisi uyarısı:</b> {gatewayError} Son geçerli görünüm ekranda korunuyor.</span>
+              <span><b>{copy.gatewayWarning}</b> {gatewayError} {copy.preserveView}</span>
             </div>
           )}
 
           {webMcp.error && (
             <div className="gateway-error" role="status">
               <Braces size={15} />
-              <span><b>WebMCP kayıt uyarısı:</b> {webMcp.error}</span>
+              <span><b>{copy.mcpWarning}</b> {webMcp.error}</span>
             </div>
           )}
 
           {snapshot.mode === "synthetic" && (
             <div className="replay-banner">
               <CircleAlert size={15} />
-              <span><b>Gösterim modu:</b> kurgusal referans değerler iş akışını gösterir; EPİAŞ verisi veya gelecek gerçekleşeni değildir.</span>
+              <span><b>{copy.demoMode}</b> {copy.demoCopy}</span>
             </div>
           )}
 
@@ -833,53 +1167,53 @@ export default function Home() {
               {snapshot.warnings?.slice(0, 4).map((warning, index) => (
                 <div className="warning-row" key={`${index}-${warning}`}>
                   <CircleAlert size={14} />
-                  <span><b>Kaynak uyarısı:</b> {warning}</span>
+                  <span><b>{copy.sourceWarning}</b> {localizeKnownText(warning, locale)}</span>
                 </div>
               ))}
             </div>
           )}
 
-          <MarketChart points={snapshot.points} startHour={scope.startHour} endHour={scope.endHour} loading={loading} />
+          <MarketChart points={snapshot.points} startHour={scope.startHour} endHour={scope.endHour} loading={loading} locale={locale} />
 
           <div className="market-readout">
             <div>
-              <span>Pencere ort. PTF</span>
+              <span>{copy.averagePtf}</span>
               <strong>{formatMaybeNumber(averagePtf)} <small>TRY/MWh</small></strong>
             </div>
             <div>
-              <span>Gün içi tepe</span>
+              <span>{copy.intradayPeak}</span>
               <strong>{formatMaybeNumber(peak?.idm)} <small>{peak?.hour ?? "—"}</small></strong>
             </div>
             <div>
-              <span>Sistemin açık olduğu saat</span>
+              <span>{copy.deficitHours}</span>
               <strong>{shortHours}<small> / {selectedPoints.length || 0}</small></strong>
             </div>
             <div>
-              <span>Kanıt tazeliği</span>
-              <strong className="freshness"><i /> Kontrol et</strong>
+              <span>{copy.freshness}</span>
+              <strong className="freshness"><i /> {copy.sourceTime}</strong>
             </div>
           </div>
 
           <section className="signals-section" aria-labelledby="signals-title">
             <div className="section-heading-row">
               <div>
-                <span className="eyebrow">SIRALANMIŞ KANIT</span>
-                <h2 id="signals-title">Risk görünümünü ne değiştirdi?</h2>
+                <span className="eyebrow">{copy.rankedEvidence}</span>
+                <h2 id="signals-title">{copy.changedRisk}</h2>
               </div>
-              <span className="row-note"><ShieldCheck size={15} /> Kaynak ve zaman damgası bağlı</span>
+              <span className="row-note"><ShieldCheck size={15} /> {copy.provenanceAttached}</span>
             </div>
             <div className="signals-list">
               {snapshot.signals.map((signal, index) => (
                 <article className="signal-row" key={signal.id} style={{ "--delay": `${index * 80}ms` } as React.CSSProperties}>
-                  <span className={`severity severity-${signal.severity}`}>{severityLabel(signal.severity)}</span>
+                  <span className={`severity severity-${signal.severity}`}>{severityLabel(signal.severity, locale)}</span>
                   <div className="signal-copy">
-                    <h3>{signal.title}</h3>
-                    <p>{signal.detail}</p>
+                    <h3>{localizeKnownText(signal.title, locale)}</h3>
+                    <p>{localizeKnownText(signal.detail, locale)}</p>
                   </div>
                   <strong>{signal.metric}</strong>
                   <div className="signal-meta">
-                    <span>{coverageLabel(signal.coverage)} veri kapsamı</span>
-                    <time>{formatTimestamp(signal.sourceTimestamp)}</time>
+                    <span>{coverageLabel(signal.coverage, locale)} {copy.dataCoverage}</span>
+                    <time>{formatTimestamp(signal.sourceTimestamp, locale)}</time>
                   </div>
                   <ChevronRight size={17} />
                 </article>
@@ -891,8 +1225,8 @@ export default function Home() {
         <aside className="agent-rail">
           <div className="agent-heading">
             <div>
-              <span className="eyebrow">AJAN ÇALIŞMA MASASI</span>
-              <h2>Ortak işlem izi</h2>
+              <span className="eyebrow">{copy.decisionSupport}</span>
+              <h2>{copy.decisionSummary}</h2>
             </div>
             <span className="trace-live"><i /> {traceLabel}</span>
           </div>
@@ -912,44 +1246,54 @@ export default function Home() {
 
           <section className="brief-sheet" aria-labelledby="brief-title">
             <div className="brief-topline">
-              <span><Gauge size={15} /> VARDİYA NOTU / TASLAK</span>
+              <span><Gauge size={15} /> {copy.shiftDraft}</span>
               <span>v1</span>
             </div>
-            <h2 id="brief-title">Operatör devri</h2>
+            <h2 id="brief-title">{copy.assessment}</h2>
             <ol>
               {brief.map((line) => <li key={line}>{line}</li>)}
             </ol>
             <div className="calculation-note">
-              <span>Stres dayanağı</span>
-              <code>{stress.calculation}</code>
+              <span>{copy.stressBasis}</span>
+              <code>{localizedStressCalculation(stress, locale)}</code>
             </div>
-            <button className={`approve-button ${approved ? "approved" : ""}`} type="button" onClick={approveBrief}>
-              {approved ? <Check size={16} /> : <ShieldCheck size={16} />}
-              {approved ? "Yerel olarak onaylandı" : "İncele ve onayla"}
-              {!approved && <ArrowRight size={16} />}
-            </button>
-            <p className="disclaimer">{stress.disclaimer}</p>
+            <p className="disclaimer">{locale === "en" ? "Indicative sensitivity analysis only; not a forecast, order recommendation, or settlement calculation." : stress.disclaimer}</p>
           </section>
 
           <footer className="data-provenance">
             <Database size={15} />
             <div>
-              <span>VERİ KAYNAĞI</span>
+              <span>{copy.dataSource}</span>
               <b>{snapshot.source.provider}</b>
-              <time>{formatTimestamp(snapshot.source.fetchedAt)}</time>
+              <time>{formatTimestamp(snapshot.source.fetchedAt, locale)}</time>
             </div>
           </footer>
         </aside>
       </section>
+          ) : activeView === "data-catalog" ? (
+            <DataCatalogWorkspace
+              key={`catalog-${catalogIntent?.revision ?? 0}`}
+              date={explorerDate}
+              refreshNonce={refreshNonce}
+              initialQuery={catalogIntent?.query}
+              initialSection={catalogIntent?.section}
+              initialSelectedId={catalogIntent?.selectedMenuId}
+              initialDatasetQuery={catalogIntent?.datasetQuery}
+              initialDatasetResult={catalogIntent?.datasetResult}
+              onCatalogStatus={setCatalogRuntimeStatus}
+              onNavigate={(destination) => setActiveView(destination)}
+              locale={locale}
+            />
           ) : (
             <TransparencyWorkspace
               key={`${activeView}-${explorerDate}-${refreshNonce}-${visibleAgentExplorer?.revision ?? 0}`}
-              view={activeView}
+              view={activeView as TransparencyView}
               date={explorerDate}
               staticDemo={STATIC_DEMO_MODE}
               initialResult={visibleAgentExplorer?.result}
               initialQuery={visibleAgentExplorer?.query}
               initialPlanningLayer={visibleAgentExplorer?.planningLayer}
+              locale={locale}
             />
           )}
         </section>
@@ -958,10 +1302,10 @@ export default function Home() {
   );
 }
 
-function formatTimestamp(value: string): string {
+function formatTimestamp(value: string, locale: Locale): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return new Intl.DateTimeFormat("tr-TR", {
+  return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "tr-TR", {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
@@ -971,12 +1315,58 @@ function formatTimestamp(value: string): string {
   }).format(parsed);
 }
 
-function severityLabel(value: MarketSnapshot["signals"][number]["severity"]): string {
+function severityLabel(value: MarketSnapshot["signals"][number]["severity"], locale: Locale): string {
+  if (locale === "en") return value === "high" ? "high" : value === "medium" ? "medium" : "watch";
   return value === "high" ? "yüksek" : value === "medium" ? "orta" : "izle";
 }
 
-function coverageLabel(value: MarketSnapshot["signals"][number]["coverage"]): string {
+function coverageLabel(value: MarketSnapshot["signals"][number]["coverage"], locale: Locale): string {
+  if (locale === "en") return value === "high" ? "high" : value === "medium" ? "medium" : "low";
   return value === "high" ? "yüksek" : value === "medium" ? "orta" : "düşük";
+}
+
+function localizedBrief(snapshot: MarketSnapshot, stress: StressResult, locale: Locale): string[] {
+  if (locale === "tr") return draftBrief(snapshot, stress);
+  const direction = stress.side === "short" ? "short" : "long";
+  const signals = snapshot.signals.slice(0, 3).map((signal) => localizeKnownText(signal.title, locale).toLowerCase());
+  return [
+    `Monitor the ${snapshot.scope.startHour}:00–${snapshot.scope.endHour}:00 delivery window; the current scenario is ${stress.positionMwh} MWh ${direction}.`,
+    stress.estimatedExposureTry === null
+      ? "Indicative impact cannot be calculated because MCP or IDM evidence is missing in the selected window."
+      : `Indicative adverse impact is ${formatTry(stress.estimatedExposureTry)}; the IDM context peak in the selected window is ${stress.contextPeakHour}.`,
+    signals.length
+      ? `Priority evidence to recheck: ${signals.join("; ")}.`
+      : "No ranked evidence yet; refresh the market view before making a decision.",
+    "Before acting, verify the position, publication times, and portfolio-specific constraints.",
+  ];
+}
+
+function localizedStressCalculation(stress: StressResult, locale: Locale): string {
+  if (locale === "tr") return stress.calculation;
+  if (stress.referencePrice === null || stress.adversePrice === null) {
+    return "Unavailable: both MCP and IDM observations are required.";
+  }
+  const adverseSpread = stress.side === "short"
+    ? Math.max(0, stress.adversePrice - stress.referencePrice)
+    : Math.max(0, stress.referencePrice - stress.adversePrice);
+  return `${stress.positionMwh} MWh × ${formatNumber(adverseSpread)} TRY/MWh adverse spread`;
+}
+
+function localizeKnownText(value: string, locale: Locale): string {
+  if (locale === "tr") return value;
+  const exact: Record<string, string> = {
+    "PTF aralığı genişliyor": "MCP range is widening",
+    "Sistem açığı sinyali": "System deficit signal",
+    "Üretim marjı daralıyor": "Generation margin is tightening",
+  };
+  if (exact[value]) return exact[value];
+  const ptf = /^Seçili penceredeki en düşük ve en yüksek PTF arasındaki fark (.+) TL\/MWh\.$/.exec(value);
+  if (ptf) return `The spread between the lowest and highest MCP in the selected window is ${ptf[1]} TRY/MWh.`;
+  const deficit = /^(\d+) saat sistemin enerji açığında olduğunu gösteriyor\. Dengeleme piyasası verisi yaklaşık dört saat gecikmeli olabilir\.$/.exec(value);
+  if (deficit) return `${deficit[1]} hours indicate a system energy deficit. Balancing-market data may be delayed by about four hours.`;
+  const margin = /^Saatlik üretim–tüketim marjı yükün (.+)% düzeyinde\.$/.exec(value);
+  if (margin) return `The hourly generation-to-consumption margin is ${margin[1]}% of load.`;
+  return value;
 }
 
 function previousIstanbulDate(now = new Date()): string {
@@ -990,6 +1380,142 @@ function previousIstanbulDate(now = new Date()): string {
   const value = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((part) => part.type === type)?.value ?? "";
   return `${value("year")}-${value("month")}-${value("day")}`;
+}
+
+type CatalogSearchEntry = {
+  id: number;
+  label: string;
+  labelEn?: string;
+  section: string;
+  trail: string[];
+};
+
+function flattenCatalogForSearch(nodes: CatalogNode[], trail: string[] = []): CatalogSearchEntry[] {
+  return nodes.flatMap((node) => {
+    const nextTrail = [...trail, node.label];
+    if (node.children.length === 0) {
+      return [{
+        id: node.id,
+        label: node.label,
+        ...(node.labelEn ? { labelEn: node.labelEn } : {}),
+        section: trail[0] ?? node.label,
+        trail: nextTrail,
+      }];
+    }
+    return flattenCatalogForSearch(node.children, nextTrail);
+  });
+}
+
+function normalizeCatalogSearch(value: string): string {
+  return value
+    .toLocaleLowerCase("tr-TR")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ı/g, "i");
+}
+
+function catalogEntryMatchesSection(
+  entry: CatalogSearchEntry,
+  section: NonNullable<SearchTransparencyDatasetsInput["section"]>,
+): boolean {
+  if (section === "all") return true;
+  if (section === "markets") return entry.section === "ELEKTRİK PİYASALARI";
+  if (section === "generation") return entry.section === "ELEKTRİK ÜRETİM";
+  if (section === "consumption") return entry.section === "ELEKTRİK TÜKETİM";
+  if (section === "renewables") {
+    return entry.section === "YEKDEM" || entry.trail.some((label) => label.includes("YEK-G"));
+  }
+  if (section === "transmission") return entry.section === "ELEKTRİK İLETİM";
+  if (section === "dams") return entry.section === "BARAJLAR";
+  if (section === "messages") return entry.section === "PİYASA MESAJ SİSTEMİ";
+  if (section === "reports") return entry.section === "ELEKTRİK PİYASASI RAPORLARI";
+  return entry.section === "ELEKTRİK PİYASASI BÜLTENLERİ";
+}
+
+function catalogVisibleIntent(input: SearchTransparencyDatasetsInput): { query?: string; section?: string } {
+  const query = input.query?.trim();
+  const section = input.section ?? "all";
+  const sectionLabels: Partial<Record<typeof section, string>> = {
+    markets: "ELEKTRİK PİYASALARI",
+    generation: "ELEKTRİK ÜRETİM",
+    consumption: "ELEKTRİK TÜKETİM",
+    transmission: "ELEKTRİK İLETİM",
+    dams: "BARAJLAR",
+    messages: "PİYASA MESAJ SİSTEMİ",
+    reports: "ELEKTRİK PİYASASI RAPORLARI",
+    bulletins: "ELEKTRİK PİYASASI BÜLTENLERİ",
+  };
+
+  if (section === "renewables") return { query: query || "YEK", section: "all" };
+  return {
+    ...(query ? { query } : {}),
+    section: sectionLabels[section] ?? "all",
+  };
+}
+
+function validateDatasetToolPage(
+  page: GetTransparencyDatasetInput["page"],
+): { number: number; size: number } {
+  const number = page?.number ?? 1;
+  const size = page?.size ?? 100;
+  if (!Number.isSafeInteger(number) || number < 1 || number > 10_000) {
+    throw new Error("page.number must be an integer from 1 through 10000.");
+  }
+  if (!Number.isSafeInteger(size) || size < 1 || size > 100) {
+    throw new Error("page.size must be an integer from 1 through 100 for WebMCP.");
+  }
+  return { number, size };
+}
+
+function validateDatasetToolDates(query: DatasetQueryInput): void {
+  const suppliedDates = [
+    ["startDate", query.startDate],
+    ["endDate", query.endDate],
+    ["date", query.date],
+    ["period", query.period],
+  ] as const;
+  const parsedDates = new Map<string, number>();
+  for (const [name, value] of suppliedDates) {
+    if (value) parsedDates.set(name, parseDatasetToolDay(value, name));
+  }
+
+  const start = parsedDates.get("startDate");
+  const end = parsedDates.get("endDate");
+  if (start === undefined || end === undefined) return;
+  if (end < start) throw new Error("endDate must not be earlier than startDate.");
+  if ((end - start) / 86_400_000 > 366) {
+    throw new Error("Dataset date range cannot exceed 366 days.");
+  }
+}
+
+function rejectUnsupportedDatasetToolDates(
+  input: GetTransparencyDatasetInput,
+  descriptor: DatasetDescriptor,
+): void {
+  const supported = new Set(descriptor.dateFields.map((field) => field.key));
+  const supplied = ["startDate", "endDate", "date", "period"] as const;
+  const unsupported = supplied.find((field) => input[field] !== undefined && !supported.has(field));
+  if (unsupported) {
+    throw new Error(`${unsupported} is not supported for ${descriptor.id}.`);
+  }
+}
+
+function parseDatasetToolDay(value: string, name: string): number {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) throw new Error(`${name} must use YYYY-MM-DD format.`);
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const timestamp = Date.UTC(year, month - 1, day);
+  const calendar = new Date(timestamp);
+  if (
+    calendar.getUTCFullYear() !== year
+    || calendar.getUTCMonth() !== month - 1
+    || calendar.getUTCDate() !== day
+  ) {
+    throw new Error(`${name} is not a valid calendar date.`);
+  }
+  return timestamp;
 }
 
 function isFiniteNumber(value: unknown): value is number {

@@ -1,5 +1,6 @@
 export type GatewayErrorCode =
   | "INVALID_REQUEST"
+  | "UNAUTHORIZED"
   | "GATEWAY_MISCONFIGURED"
   | "UPSTREAM_AUTH_FAILED"
   | "UPSTREAM_TIMEOUT"

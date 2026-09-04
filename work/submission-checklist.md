@@ -2,10 +2,10 @@
 
 ## Product and demo
 
-- [x] Public deployment works in clean desktop and mobile browsers: https://haakanergun.github.io/gridbrief-tr/
-- [x] Main scenario works: synthetic next-day reference dated 2026-09-04, short 50 MWh, 17:00–22:00 inclusive, snapshot, stress, draft, manual edit, human approval.
+- [x] Protected English/Turkish production deployment works in desktop Chrome: https://gridbrief-tr.vercel.app/en
+- [x] The recorded real-data scenario uses the completed 2026-09-03 market day and keeps provider, retrieval time, coverage, and warnings visible.
 - [x] WebMCP scenario uses the equivalent exclusive tool boundary: `startHour: 17`, `endHour: 23`.
-- [x] The original four-tool flow was verified in Chrome 152; the current compatible browser runtime discovers all six tools and successfully executes the two new entity/planning tools.
+- [x] Chrome 152 discovers all eight native `document.modelContext` tools; the sample agent successfully executes `search_transparency_datasets`, while unavailable live reads fail closed without substituting synthetic rows.
 - [x] No tool can execute or place an order.
 - [x] Synthetic data is used only when live mode is explicitly disabled and is labelled `synthetic` / `not EPİAŞ`; enabling live mode with missing credentials fails closed, while a partial live-source failure shows warnings and null metrics instead.
 - [x] No EPİAŞ credentials, TGT, `.env`, or account data are in browser assets, git history, or repository. Re-check the screen recording before upload.

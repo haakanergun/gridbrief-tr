@@ -1,54 +1,67 @@
 # GridBrief TR
 
-[Public synthetic challenge demo](https://haakanergun.github.io/gridbrief-tr/) · [Protected live EPİAŞ workspace](https://gridbrief-tr.vercel.app/) · [OpenAI WebMCP Challenge](https://webmcp.devpost.com/)
+[Protected live EPİAŞ workspace](https://gridbrief-tr.vercel.app/) · [OpenAI WebMCP Challenge](https://webmcp.devpost.com/)
 
-**GridBrief TR** is an agent-native risk workspace for participants in Türkiye's electricity market. It turns a market operator's question—such as “I am short 50 MWh for the next delivery day from 17:00 to 22:00; what should I watch?”—into a human-reviewable, source- and freshness-aware shift brief.
+**GridBrief TR** is an agent-native operations and data workspace for participants in Türkiye’s electricity market. It brings market risk, organizations, power plants, production planning, and the EPİAŞ Şeffaflık Platformu 2.0 electricity catalogue into one source- and freshness-aware interface.
 
-It is a decision-support prototype. It does not place orders, connect to a trading account, or recommend an execution. A human sets the exposure, changes assumptions, reviews the evidence, and explicitly approves a draft brief.
+The current challenge deployment is the protected Vercel workspace above. Evaluation access credentials can be supplied separately without exposing the server-side EPİAŞ account. GridBrief is a decision-support prototype: it does not place orders, connect to a trading account, alter source data, or recommend an execution.
 
 ## Why WebMCP
 
-Energy-market analysis often alternates between a participant's browser, operator data pages, spreadsheets, and a chat. That loses the user's selected scope and makes it hard to see which source and timestamp support an answer.
+Energy-market analysis often alternates between operator pages, spreadsheets, and chat. That fragments the selected scope and makes it difficult to determine which source, publication level, and timestamp support an answer.
 
-The information surface is substantial: EPİAŞ reports that its Transparency Platform served 28,006 registered users in 2025 through 181 report screens and 253 web services. Those figures describe the surrounding platform—not GridBrief's user count—and ground the workflow opportunity in a real operating context. See the official [EPİAŞ 2025 Annual Report](https://www.epias.com.tr/wp-content/uploads/2026/04/4-FAALIYET-RAPORU-2025.pdf).
+The surrounding information surface is substantial: EPİAŞ reports that its Transparency Platform served 28,006 registered users in 2025 through 181 report screens and 253 web services. Those figures describe the EPİAŞ platform—not GridBrief’s user count—and ground the workflow opportunity in a real operating context. See the official [EPİAŞ 2025 Annual Report](https://www.epias.com.tr/wp-content/uploads/2026/04/4-FAALIYET-RAPORU-2025.pdf).
 
-GridBrief exposes the current workspace as WebMCP tools so a browser agent can operate *with* the user instead of merely describing the page:
+GridBrief exposes the current workspace through eight imperative WebMCP tools:
 
 1. `set_analysis_scope` sets the delivery date and time range;
-2. `get_market_snapshot` reads the current market snapshot and its provenance;
-3. `find_market_entities` searches the organization and plant catalogs and opens the matching workspace;
+2. `get_market_snapshot` reads the selected market snapshot with provenance and warnings;
+3. `find_market_entities` searches organization and power-plant references and opens the matching workspace;
 4. `compare_plan_actual` loads KGÜP, KUDÜP, EAK, generation, load-plan, and consumption evidence at their published data levels;
-5. `stress_test_position` tests a stated exposure against a disclosed what-if scenario; and
-6. `draft_shift_brief` prepares an editable brief that preserves source, collection time, and mode labels.
+5. `stress_test_position` applies a disclosed what-if price shock to a stated exposure;
+6. `draft_shift_brief` renders a visible, source-attributed shift brief;
+7. `search_transparency_datasets` searches the full electricity catalogue by name or section and synchronizes the visible catalogue; and
+8. `get_transparency_dataset` queries one allowlisted catalogue dataset by stable `datasetId` or official `menuId` and renders the result in the page.
 
-The agent does the repetitive retrieval and synthesis; the human remains responsible for inputs, changed assumptions, and approval. This is deliberately read-only: no market action is exposed as a tool.
+All eight tools are read-only with respect to EPİAŞ, market accounts, and trading systems. Some tools update the visible local workspace so the user and browser agent share the same scope and evidence; none exposes an arbitrary upstream URL, modifies EPİAŞ data, or performs a market action. Human review remains essential for operational decisions, but the challenge flow does not depend on a separate approval button.
 
-## Demo scenario
+## Professional Transparency catalogue
 
-The included synthetic replay uses a **50 MWh short position for the next-day reference scenario dated 4 September 2026, 17:00–22:00 (Türkiye time)**. The browser agent sets that scope, gathers the labelled reference snapshot, runs a price stress, and drafts a brief. The user then changes an assumption and approves the revised brief. See [work/demo-script.md](work/demo-script.md).
+The **Tüm EPİAŞ verileri** view turns the official electricity menu tree into a professional three-pane workspace:
 
-The visible UI and `POST /api/market` use an **inclusive** ending hour: `17` through `22` covers 17:00–22:59. WebMCP's `endHour` is an **exclusive** boundary, so the agent uses `startHour: 17, endHour: 23` for that same delivery range.
+- nine electricity data areas and 134 official catalogue items remain searchable without overloading the primary product navigation;
+- section filters, favourites, grouped dataset lists, Turkish/English labels, breadcrumbs, update cadence, unit family, source metadata, and technical-documentation links keep discovery inspectable;
+- allowlisted datasets expose only their declared date fields and filters, then render normalized quality metadata, tables, and charts in the same workspace; and
+- desktop panes preserve section, list, and detail context, while the mobile layout keeps all five primary product destinations available without horizontal page overflow.
+
+The catalogue currently maps **132 of 134** official selectable menu leaves to allowlisted, documentation-mapped JSON adapters across the EPİAŞ electricity and reporting services. The two explicit exceptions are intentional:
+
+- menu 59, **Kurulu Güç**, remains disabled until the official date-switch rule between its two endpoints is verified; and
+- menu 254, **Elektrik Piyasası Bültenleri**, links to EPİAŞ’s official bulletin page because it is a document publication rather than a JSON dataset.
+
+This is adapter coverage, not a claim that every source is continuously available or that every endpoint returned data during one test run. Unknown dataset IDs, arbitrary paths, undeclared filters, invalid dates, excessive ranges, and oversized pages are rejected by the gateway.
 
 ## Data modes and integrity
 
-GridBrief distinguishes its modes in the interface and in every brief:
+Market observations and catalogue structure have separate, explicit runtime states.
 
-| Mode | What it means |
+| State | Meaning |
 | --- | --- |
-| Live EPİAŞ | When live mode is explicitly enabled and both server-only credentials are configured, the gateway retrieves supported EPİAŞ Transparency Platform reports. A source and retrieval timestamp are attached to the snapshot. An individual upstream failure is returned as a null field plus a warning—never silently replaced with synthetic data. |
-| Synthetic demo | Deterministic, clearly labelled demo data is used while the server-only live-mode switch is disabled. It is for workflow demonstration only and must not be interpreted as market data. |
+| Live EPİAŞ | Live mode is enabled and server-only credentials are configured. Supported market or dataset requests are retrieved from EPİAŞ and returned with source, retrieval time, scope, and quality metadata. |
+| Synthetic market demo | When the server-only live switch is disabled, deterministic market fixtures demonstrate the risk workflow and are labelled synthetic. They are not EPİAŞ observations or forecasts. |
+| Live catalogue | The current official EPİAŞ electricity menu tree was fetched and its expected adapter coverage was checked. |
+| `degraded-live` catalogue | A current menu tree was fetched, but its menu or adapter coverage differs from the verified expectation. The mismatch is warned and affected adapters are disabled safely. |
+| `stale-live` catalogue | A previously fetched live menu tree is retained when a later catalogue refresh temporarily fails. The UI shows that it is the last successful live catalogue rather than a current synchronization. |
+| `auth-fallback` catalogue | EPİAŞ authentication failed, so the available cached or verified catalogue structure is shown with an authentication warning. Live dataset queries may remain unavailable until access is restored. |
+| `verified-snapshot` catalogue | If no cached live tree is available, GridBrief can display the bundled catalogue structure verified on 3 September 2026. This preserves navigation metadata only; it does not fabricate live dataset rows. |
 
-EPİAŞ access requires a registered Transparency Platform account and an authentication token (TGT). The server obtains the TGT through EPİAŞ authentication, retains it only in server memory for up to two hours (with a five-minute renewal buffer), and never returns or logs the credential or TGT. Do not put credentials or tokens in browser code, prompts, screenshots, commits, or public deployments.
+If a live dataset request fails, GridBrief surfaces the error or partial-quality state; it does not substitute synthetic rows. A catalogue fallback therefore cannot masquerade as a successful live data query. Missing market metrics remain null with warnings rather than being silently converted to zero or demo values.
 
-Data availability differs by report. A snapshot's retrieval timestamp and source note are evidence about when GridBrief received it, not a promise of real-time market data. In particular, the gateway notes that SMF and system direction can be about four hours delayed, consumption about two hours delayed, and generation may be available only through the preceding day. Missing live metrics are returned as null values with warnings rather than silently substituted values.
+EPİAŞ access requires a registered Transparency Platform account and a ticket-granting token (TGT). The server obtains the TGT through EPİAŞ authentication, keeps it only in server memory for up to two hours with a five-minute renewal buffer, and never returns or logs the credential or TGT. Do not place credentials or tokens in browser code, prompts, screenshots, commits, or public deployments.
 
-GridBrief is not affiliated with EPİAŞ. EPİAŞ is the named source where applicable; the product does not use EPİAŞ branding as its own.
+Data availability differs by report. Retrieval timestamps indicate when GridBrief received a response, not that every value is real time. Publication delays, empty results, coverage gaps, and capped responses remain visible in the result metadata.
 
-The public challenge deployment neither retrieves nor redistributes EPİAŞ data. The optional server gateway is intended only for a user operating under their own authorized EPİAŞ account and remains subject to EPİAŞ terms and any applicable limits on use, storage, display, or redistribution.
-
-Because the walkthrough's delivery window is in the future relative to its build date, the synthetic observations demonstrate the collaboration flow; they are not claimed as future actuals. A production next-day view would use day-ahead PTF plus appropriately licensed forecast and outage inputs, while delayed consumption, generation, SMF, and system-direction observations would appear only as current context. That temporal split is future work, not a capability claimed by this prototype.
-
-The core market snapshot has documentation-mapped adapters for six EPİAŞ Transparency Platform reports: day-ahead market PTF, balancing-market SMF, intraday-market weighted-average price, real-time consumption, real-time generation, and system direction. The explorer additionally maps the official organization, plant, UEVÇB, participant, clearing-quantity, KGÜP, KUDÜP, EAK, injection-quantity, and load-plan services. Organization and UEVÇB filters apply only to production plans; load-plan and consumption observations remain Türkiye-system data. See the official [EPİAŞ Electricity Service technical documentation](https://seffaflik.epias.com.tr/electricity-service/technical/tr/index.html). Complete a production and legal review before enabling live use.
+GridBrief is independent and is not affiliated with or endorsed by EPİAŞ. Optional live use requires the operator’s own authorized account and remains subject to EPİAŞ terms and any applicable limits on use, storage, display, or redistribution. Complete a production and legal review before operational use.
 
 ## Run locally
 
@@ -59,11 +72,11 @@ npm install
 npm run dev
 ```
 
-Open the local URL printed by the dev server. Use **Demo / synthetic** mode for a credential-free walkthrough.
+Without live configuration, the market workspace uses its clearly labelled synthetic fixtures, while the catalogue and dataset APIs fail closed. After an authorized gateway is configured, a failed live menu refresh can use the explicitly labelled cached or verified structural fallback; live dataset queries never receive fabricated fallback rows.
 
 ### Optional live EPİAŞ configuration
 
-Create a local `.env.local` file from `.env.example`, then supply the server-only values below. Never prefix them with `NEXT_PUBLIC_` and never commit `.env.local`. The separate switch prevents accidentally enabling live traffic merely by leaving credentials in an environment.
+Create `.env.local` from `.env.example`, then provide the server-only values below. Never prefix them with `NEXT_PUBLIC_`, and never commit `.env.local`. The explicit switch prevents live traffic from being enabled merely because credentials exist in an environment.
 
 ```bash
 EPTR_LIVE_ENABLED=true
@@ -73,64 +86,59 @@ GRIDBRIEF_ACCESS_USERNAME=choose_a_judge_username
 GRIDBRIEF_ACCESS_PASSWORD=choose_a_long_random_password
 ```
 
-When live mode is enabled, production requests fail closed unless the access username and password are also configured. The root page and API are protected with HTTP Basic authentication; put those **GridBrief access credentials**, never the EPİAŞ credentials, in the Devpost testing instructions. The market route also checks same-origin browser requests, applies a best-effort per-instance rate limit, caps the actual UTF-8 request size, and caches a fetched market day briefly in server memory. These controls reduce exposure but do not replace the hosting provider's access protection or a shared production-grade rate-limit store.
+When live mode is enabled in production, the application fails closed unless both GridBrief access credentials and EPİAŞ credentials are configured. The page and APIs use HTTP Basic authentication; share only the **GridBrief access credentials** with evaluators, never the EPİAŞ credentials.
 
-After an authorized live page loads, the client checks the gateway configuration and automatically requests the preceding completed Türkiye-market day. This replaces the initial replay snapshot with source-attributed EPİAŞ results when the credentialed request succeeds; the normal warning state remains visible if authentication or an upstream report fails.
+The server applies same-origin checks to production POST requests, caps UTF-8 request bodies, validates every dataset against the allowlisted registry, constrains filters and pagination, and caches selected responses briefly in memory. These controls reduce exposure but do not replace hosting-provider access protection, a shared production rate limiter, or a formal security review.
 
-The gateway defaults to the Transparency Platform production ticket endpoint, `https://giris.epias.com.tr/cas/v1/tickets`, as specified in EPİAŞ's [Transparency electricity-service technical documentation](https://seffaflik.epias.com.tr/electricity-service/technical/tr/index.html) and [Transparency ticket-service announcement](https://www.epias.com.tr/tum-duyurular/seffaflik-platformu-web-servisleri-ticket-tgt-alma-servisinde-degisiklik/). `EPTR_AUTH_URL` can override that server-side if EPİAŞ supplies a future endpoint; never expose it with a `NEXT_PUBLIC_` prefix.
+The gateway defaults to the Transparency Platform ticket endpoint, `https://giris.epias.com.tr/cas/v1/tickets`, as specified in EPİAŞ’s [electricity-service technical documentation](https://seffaflik.epias.com.tr/electricity-service/technical/tr/index.html) and [ticket-service announcement](https://www.epias.com.tr/tum-duyurular/seffaflik-platformu-web-servisleri-ticket-tgt-alma-servisinde-degisiklik/). `EPTR_AUTH_URL` is an optional server-side override for a future endpoint supplied by EPİAŞ.
 
-The live path was integration-tested on 3 September 2026 against the completed 1 and 2 September market days: all six configured reports returned 24 hourly items with no gateway warnings. Reports are read sequentially because burst requests proved less reliable against the live service. Credentials and TGT values were neither logged nor stored in the repository.
-
-Live access is optional for the challenge demo. If configured live requests partially fail, the gateway returns warnings and null metrics. It does not downgrade a live request to synthetic data. Set `EPTR_LIVE_ENABLED=false` for the explicitly labelled synthetic demo. Do not claim live verification until a request has succeeded with an authorized account.
-
-## Test
+## Verify
 
 ```bash
 npm run lint
+npx tsc --noEmit
 npm run build
 ```
 
-For a WebMCP verification, start the app in a supported browser-agent environment, open the workspace, and ask the agent to carry out the demo scenario. Confirm that the agent's calls visibly update the scope, snapshot, stress result, and draft; then edit an assumption manually and confirm the revised draft requires human approval.
+Fast WebMCP walkthrough:
 
-Fast judge walkthrough:
+1. Open the [protected Vercel workspace](https://gridbrief-tr.vercel.app/) with the GridBrief evaluator credentials.
+2. In a compatible WebMCP browser environment, confirm that the page reports WebMCP availability and discovers eight unique tools.
+3. Ask the agent to use `search_transparency_datasets` for a named dataset or section, then use the returned `datasetId` with `get_transparency_dataset` for a bounded date range.
+4. Confirm that catalogue selection, query scope, result quality, source, runtime state, and any warning are also visible in the page.
+5. Optionally continue through entity search, plan comparison, market snapshot, stress scenario, and shift-brief drafting. Inspect the evidence before using it in an operational decision; no additional approval control is required to demonstrate the read-only WebMCP flow.
 
-1. Open the [live challenge demo](https://haakanergun.github.io/gridbrief-tr/) in ChatGPT's WebMCP-capable in-app browser, or in Chrome 149+ after enabling `chrome://flags/#enable-webmcp-testing` and restarting.
-2. Confirm the header says `WebMCP ready`, then click **Copy agent prompt** and give that instruction to the browser agent.
-3. Ask the agent to search a demo organization and compare its plan evidence, then run the position workflow. Watch `DEMO TRACE` change to `WEBMCP TRACE` as the six tools update the visible entity, planning, scope, snapshot, stress, and draft views.
-4. Click **Review & approve** yourself; approval is intentionally not exposed as an agent tool.
-
-The original four-tool flow was exercised against Chrome 152's experimental WebMCP implementation. The current six-tool build was then re-verified in a compatible browser WebMCP runtime: all six registrations were discovered, and `find_market_entities` plus `compare_plan_actual` returned structured results and visibly opened their corresponding workspaces without console errors.
-
-The market gateway can also be checked without a browser agent:
+The server routes can also be checked directly after authentication:
 
 ```bash
-curl http://localhost:3000/api/health
-curl --user "judge:your_gridbrief_access_password" -X POST http://localhost:3000/api/market -H "Origin: http://localhost:3000" -H "Content-Type: application/json" -d '{"date":"2026-09-02","startHour":17,"endHour":22,"positionMwh":50,"side":"short"}'
+curl --user "judge:your_gridbrief_access_password" https://gridbrief-tr.vercel.app/api/health
+curl --user "judge:your_gridbrief_access_password" https://gridbrief-tr.vercel.app/api/catalog
+curl --user "judge:your_gridbrief_access_password" https://gridbrief-tr.vercel.app/api/dataset
 ```
 
-Use a completed historical date for the first authorized smoke test so delayed actual reports can be validated. A next-day date may legitimately contain PTF while GİP, SMF, system direction, consumption, or generation remain unavailable.
+Use a completed historical date for the first authorized data smoke test. A current or next-day selection may legitimately have unpublished or delayed series.
 
 ## Deploy
 
-Deploy the app to a Node-compatible host using the repository's standard build command:
+The current challenge workspace is deployed to the protected Node-compatible Vercel URL:
+
+[https://gridbrief-tr.vercel.app/](https://gridbrief-tr.vercel.app/)
+
+Build with the repository’s standard command and store every server-only value in the host’s encrypted environment configuration:
 
 ```bash
 npm run build
 ```
 
-Add all server-only secrets only in the host’s encrypted environment configuration. Do not set `GITHUB_PAGES` or `NEXT_PUBLIC_STATIC_DEMO` on the Node deployment. The public GitHub Pages challenge deployment remains synthetic and has no EPİAŞ secret. Before sharing the protected Node deployment, test a completed historical date, `GET /api/health`, the WebMCP tool registration, mode labels, partial-data warnings, and the kill-switch synthetic path.
-
-### GitHub Pages fallback
-
-The repository includes a GitHub Actions workflow that publishes the [public challenge demo](https://haakanergun.github.io/gridbrief-tr/) as a static, synthetic-only build. The workflow removes server-only API routes and the unsupported request proxy in its disposable checkout, builds with `GITHUB_PAGES=true` and `NEXT_PUBLIC_STATIC_DEMO=true`, and deploys the generated `out` directory. In this build only, form and WebMCP refreshes generate the same deterministic, clearly labelled synthetic snapshot directly in the browser; standard local and Node-compatible deployments continue to use `POST /api/market` unchanged. The Pages fallback intentionally has no `/api/*` endpoints.
+Do not enable the static GitHub Pages flags on the Vercel deployment. Before sharing evaluator access, verify `GET /api/health`, all eight WebMCP registrations, `/api/catalog`, `/api/dataset` capability discovery, one bounded historical dataset query, catalogue runtime labels, and the live-mode kill switch. Never place evaluator or EPİAŞ credentials in the repository or a command transcript.
 
 ## Project notes
 
 - Challenge explanation and copy: [work/devpost-submission.md](work/devpost-submission.md)
-- Recording plan: [work/demo-script.md](work/demo-script.md)
 - Submission checks: [work/submission-checklist.md](work/submission-checklist.md)
-- License: [MIT](LICENSE).
+- Design and interaction QA: [design-qa.md](design-qa.md)
+- License: [MIT](LICENSE)
 
 ## Safety and limits
 
-This prototype is not financial, legal, or operational advice. It does not calculate collateral, credit, imbalance settlement, or an executable hedge. Scenario values are transparent sensitivity calculations, not forecasts. Validate data, timestamps, market rules, and any decision in the participant’s approved risk process.
+This prototype is not financial, legal, or operational advice. It does not calculate collateral, credit, imbalance settlement, or an executable hedge. Scenario values are transparent sensitivity calculations, not forecasts. Validate data, timestamps, report semantics, market rules, and any decision in the participant’s approved risk process.

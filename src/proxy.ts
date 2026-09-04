@@ -86,5 +86,5 @@ function errorResponse(
 }
 
 export const config = {
-  matcher: ["/", "/api/:path*"],
+  matcher: ["/", "/tr/:path*", "/en/:path*", "/api/:path*"],
 };

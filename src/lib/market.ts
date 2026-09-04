@@ -125,7 +125,7 @@ export function draftBrief(snapshot: MarketSnapshot, stress: StressResult): stri
     topSignals.length
       ? `Yeniden kontrol edilecek başlıca kanıtlar: ${topSignals.join("; ")}.`
       : "Henüz sıralanmış kanıt yok; karar öncesinde piyasa görünümünü yenileyin.",
-    "İnsan kontrolü zorunludur: aksiyon almadan önce pozisyonu, veri yayın saatlerini ve portföye özgü kısıtları doğrulayın.",
+    "Aksiyon almadan önce pozisyonu, veri yayın saatlerini ve portföye özgü kısıtları doğrulayın.",
   ];
 }
 

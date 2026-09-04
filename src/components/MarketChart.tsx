@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { Locale } from "@/i18n/locale";
 import type { MarketPoint } from "@/lib/market";
 
 interface MarketChartProps {
@@ -8,6 +9,7 @@ interface MarketChartProps {
   startHour: number;
   endHour: number;
   loading?: boolean;
+  locale?: Locale;
 }
 
 const WIDTH = 960;
@@ -17,7 +19,8 @@ const BOTTOM = 46;
 const LEFT = 52;
 const RIGHT = 22;
 
-export function MarketChart({ points, startHour, endHour, loading = false }: MarketChartProps) {
+export function MarketChart({ points, startHour, endHour, loading = false, locale = "tr" }: MarketChartProps) {
+  const en = locale === "en";
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const chart = useMemo(() => buildChart(points), [points]);
   const active = activeIndex === null ? null : points[activeIndex];
@@ -36,22 +39,22 @@ export function MarketChart({ points, startHour, endHour, loading = false }: Mar
   }
 
   if (!points.length) {
-    return <div className="chart-empty">Piyasa görünümü bekleniyor…</div>;
+    return <div className="chart-empty">{en ? "Waiting for the market view…" : "Piyasa görünümü bekleniyor…"}</div>;
   }
 
   return (
     <div className={`chart-shell ${loading ? "is-loading" : ""}`}>
       <div className="chart-legend" aria-label="Chart legend">
-        <span><i className="legend-line legend-ptf" />PTF</span>
-        <span><i className="legend-line legend-idm" />GİP AOF</span>
-        <span><i className="legend-line legend-smf" />SMF</span>
+        <span><i className="legend-line legend-ptf" />{en ? "MCP (PTF)" : "PTF"}</span>
+        <span><i className="legend-line legend-idm" />{en ? "IDM WAP" : "GİP AOF"}</span>
+        <span><i className="legend-line legend-smf" />{en ? "SMP (SMF)" : "SMF"}</span>
         <span className="chart-unit">TRY / MWh</span>
       </div>
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="market-chart"
         role="img"
-        aria-label="Saatlik PTF, gün içi ağırlıklı ortalama ve SMF fiyatları"
+        aria-label={en ? "Hourly MCP, intraday weighted average, and SMP prices" : "Saatlik PTF, gün içi ağırlıklı ortalama ve SMF fiyatları"}
         onPointerMove={onPointerMove}
         onPointerLeave={() => setActiveIndex(null)}
       >
@@ -68,7 +71,7 @@ export function MarketChart({ points, startHour, endHour, loading = false }: Mar
           height={HEIGHT - TOP - BOTTOM}
           className="risk-window"
         />
-        <text x={riskStart + 9} y={TOP + 17} className="risk-label">TESLİMAT PENCERESİ</text>
+        <text x={riskStart + 9} y={TOP + 17} className="risk-label">{en ? "DELIVERY WINDOW" : "TESLİMAT PENCERESİ"}</text>
         {chart.ticks.map((tick) => (
           <g key={tick.value}>
             <line x1={LEFT} x2={WIDTH - RIGHT} y1={tick.y} y2={tick.y} className="grid-line" />
@@ -103,9 +106,9 @@ export function MarketChart({ points, startHour, endHour, loading = false }: Mar
       {active && activeIndex !== null && (
         <div className="chart-tooltip" style={{ left: `${(chart.xForIndex(activeIndex) / WIDTH) * 100}%` }}>
           <b>{active.hour}</b>
-          <span>PTF {formatChartValue(active.ptf)}</span>
-          <span>GİP {formatChartValue(active.idm)}</span>
-          <span>SMF {formatChartValue(active.smf)}</span>
+          <span>{en ? "MCP" : "PTF"} {formatChartValue(active.ptf)}</span>
+          <span>{en ? "IDM" : "GİP"} {formatChartValue(active.idm)}</span>
+          <span>{en ? "SMP" : "SMF"} {formatChartValue(active.smf)}</span>
         </div>
       )}
       <div className="chart-loading-line" />
