@@ -85,7 +85,7 @@ Before production use, we would complete a formal review of report semantics, ac
 
 - Protected live application: https://gridbrief-tr.vercel.app/en
 - Source code: https://github.com/haakanergun/gridbrief-tr
-- Demo video (under three minutes): [YOUTUBE_URL]
+- Demo video (under three minutes): https://youtu.be/5dGW_ocNZJw
 
 ## Attribution and disclosures
 
